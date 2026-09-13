@@ -34,7 +34,7 @@ function backAction(){return location.pathname==='/tv/management'?'<button type=
 function logoutAction(){return '<button type="button" class="header-action" data-action="logout">Logout</button>'}
 
 function tvTabs(){
-  const all=[['/tv/management','Management TV'],['/tv/agents','Agent TV'],['/tv/branches','Branch TV'],['/tv/technical','Technical TV']];
+  const all=[['/tv/management','Management TV'],['/tv/agents','Agent TV'],['/tv/branches','Branch TV']];
   const links=me?.role==='AGENT'?all.slice(1,2):me?.role==='BRANCH'?all.slice(2,3):['ADMIN','QA_LEAD','MANAGER','DISPLAY','OBSERVER'].includes(me?.role)?all:[];
   return links.length?'<nav class="tv-tabs" aria-label="TV screens">'+links.map(([href,text])=>'<a href="'+href+'"'+(location.pathname===href?' aria-current="page"':'')+'>'+text+'</a>').join('')+'</nav>':'';
 }
@@ -89,11 +89,6 @@ async function participantTv(type){
   const metrics=[['Assigned cases',data.assignedCases],['Submitted cases',data.submittedCases],['Testing participants',data.testingParticipants],['Done participants',data.doneParticipants]];
   const cards=data.items.map(person=>'<article class="card participant-tv-card"><div class="participant-tv-main"><span class="station-code">'+escapeHtml(person.code)+'</span><div><h2>'+escapeHtml(person.name)+'</h2><p>'+count(person.activeChannels)+' active channel'+(count(person.activeChannels)===1?'':'s')+'</p></div></div><div class="participant-tv-result"><b>'+count(person.progressPercent)+'%</b><span class="tv-participant-status '+person.status.toLowerCase()+'">'+escapeHtml(person.status)+'</span><small>'+count(person.submitted)+' / '+count(person.assigned)+' submitted</small></div><progress value="'+count(person.submitted)+'" max="'+Math.max(1,count(person.assigned))+'" aria-label="'+escapeHtml(person.code)+' submission progress"></progress></article>').join('');
   $('#content').innerHTML='<section class="participant-tv-context"><div><b>'+(privateView?'Your testing progress':escapeHtml(type==='AGENT'?'All assigned agents':'All assigned branch teams'))+'</b><p>Updated '+escapeHtml(new Date(data.lastUpdated).toLocaleString('en-GB'))+'</p></div></section><section class="metrics participant-tv-metrics" aria-label="TV totals">'+metrics.map(([name,value])=>'<div class="metric"><small>'+name+'</small><b>'+count(value)+'</b></div>').join('')+'</section><section class="participant-tv-list'+(privateView?' private-view':' '+gridClass)+'" aria-label="Participant progress">'+(cards||'<article class="card participant-tv-empty"><h2>No assigned test cases</h2><p>Participants appear here after test cases are assigned.</p></article>')+'</section>';
-}
-async function technical(){
-  if(!await requireSession())return;shell('Technical & QA · Failure resolution','technical');
-  const data=await api('/api/tv/technical'),groups=Object.groupBy?Object.groupBy(data.items,item=>item.channel):data.items.reduce((result,item)=>{(result[item.channel]??=[]).push(item);return result},{});
-  $('#content').innerHTML=Object.entries(groups).map(([channel,items])=>'<section class="card technical-list"><h2>'+escapeHtml(channel)+' · Failed cases</h2><div class="rows">'+items.map(item=>'<div class="row"><div><b>'+escapeHtml(item.case_code)+'</b><div class="muted">'+escapeHtml(item.participant_code+' · '+item.participant_name)+'</div></div><span>'+escapeHtml(item.title)+'</span><span>'+escapeHtml(item.owner||'Unassigned')+'</span>'+badge(item.status)+'</div>').join('')+'</div></section>').join('')||'<section class="card"><p class="form muted">No defects to display.</p></section>';
 }
 
 async function login(){
@@ -157,7 +152,7 @@ async function observer(){
  $('#observer-link').addEventListener('submit',async event=>{event.preventDefault();try{await api('/api/observer/testers',{method:'POST',body:JSON.stringify({participantId:Number(new FormData(event.target).get('participantId'))})});await observer()}catch(error){const notice=document.createElement('p');notice.className='notice error';notice.setAttribute('role','alert');notice.textContent=error.message;$('#content').prepend(notice)}});
 }
 async function route(){
-  clearInterval(countdownTimer);try{const pathname=location.pathname;if(pathname==='/tv/management')return await management();if(pathname==='/tv/technical')return await technical();if(pathname==='/tv/agents')return await participantTv('AGENT');if(pathname==='/tv/branches')return await participantTv('BRANCH');if(pathname==='/observer')return await observer();if(pathname==='/admin')return await admin();if(pathname==='/qa')return await qa();if(pathname==='/my-tests'||pathname==='/scan')return await myTests();return await login()}catch(error){const container=$('#content')||app;container.innerHTML='<section class="notice error" role="alert"><b>Unable to load this view.</b><p>'+escapeHtml(error.message)+'</p><a href="/login?return='+encodeURIComponent(location.pathname+location.search)+'">Sign in</a></section>'}
+  clearInterval(countdownTimer);try{const pathname=location.pathname;if(pathname==='/tv/management')return await management();if(pathname==='/tv/agents')return await participantTv('AGENT');if(pathname==='/tv/branches')return await participantTv('BRANCH');if(pathname==='/observer')return await observer();if(pathname==='/admin')return await admin();if(pathname==='/qa')return await qa();if(pathname==='/my-tests'||pathname==='/scan')return await myTests();return await login()}catch(error){const container=$('#content')||app;container.innerHTML='<section class="notice error" role="alert"><b>Unable to load this view.</b><p>'+escapeHtml(error.message)+'</p><a href="/login?return='+encodeURIComponent(location.pathname+location.search)+'">Sign in</a></section>'}
 }
 route();
 if(location.pathname.startsWith('/tv/')){

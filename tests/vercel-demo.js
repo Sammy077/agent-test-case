@@ -23,8 +23,9 @@ function request(url,method='GET',body='',cookie='',parsedBody){
  production.db.prepare("INSERT INTO observer_participants SELECT id,1,CURRENT_TIMESTAMP FROM users WHERE username='observer01'").run();
  let r=await request('/actions/login','POST','username=observer01&password=Observer%40123');assert.equal(r.status,303);const cookie=r.headers['set-cookie'].split(';')[0];assert.match(cookie,/ptc_session=/);
  r=await request('/observer','GET','',cookie);assert.equal(r.status,200);assert.match(r.body,/A01/);assert.match(r.body,/DEMO/);
- for(const tv of ['management','agents','branches','technical']){const screen=await request('/tv/'+tv,'GET','',cookie);assert.equal(screen.status,200);assert.match(screen.body,/Technical TV/);if(tv==='management'){assert.match(screen.body,/>Passed</);assert.doesNotMatch(screen.body,/>Completed</)}}
- for(const api of ['/api/dashboard','/api/tv/participants?type=AGENT','/api/tv/participants?type=BRANCH','/api/tv/technical'])assert.equal((await request(api,'GET','',cookie)).status,200);
+ for(const tv of ['management','agents','branches']){const screen=await request('/tv/'+tv,'GET','',cookie);assert.equal(screen.status,200);assert.doesNotMatch(screen.body,/Technical TV/);if(tv==='management'){assert.match(screen.body,/>Passed</);assert.doesNotMatch(screen.body,/>Completed</)}}
+ for(const api of ['/api/dashboard','/api/tv/participants?type=AGENT','/api/tv/participants?type=BRANCH'])assert.equal((await request(api,'GET','',cookie)).status,200);
+ for(const removed of ['/tv/technical','/api/tv/technical'])assert.equal((await request(removed,'GET','',cookie)).status,404);
  r=await request('/api/events','GET','',cookie);assert.equal(r.status,204);
  r=await request('/api/me','GET','',cookie);assert.equal(r.status,200);const session=JSON.parse(r.body).user;
  r=await request('/actions/observer/link','POST','participantId=2&_csrf='+encodeURIComponent(session.csrf),cookie);assert.equal(r.status,303);assert.equal(production.db.prepare('SELECT observer_user_id FROM observer_participants WHERE participant_id=2').get().observer_user_id,session.id);
