@@ -10,7 +10,8 @@
     "test": "node test.js",
     "test:demo": "node tests/vercel-demo.js",
     "reset:local": "node scripts/reset-local.js",
-    "test:shared": "node tests/shared-database.js"
+    "test:shared": "node tests/shared-database.js",
+    "test:confirmation": "node tests/reassignment-confirmation.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

@@ -1,0 +1,13 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const listeners={},form={id:'bulk-form'},items=[{dataset:{currentTester:'CASE-1 → A01 · Alice'}},{dataset:{currentTester:''}}];
+let accepted=false,sent=0,cancelled=0;
+const source=fs.readFileSync('public/htmx-client.js','utf8').split('function assignmentWarning(form)')[1];
+vm.runInNewContext('function assignmentWarning(form)'+source,{document:{querySelectorAll:()=>items,addEventListener:(event,fn)=>listeners[event]=fn},window:{htmx:{},confirm:message=>{assert.match(message,/CASE-1 → A01 · Alice/);return accepted}}});
+const event={detail:{elt:{closest:()=>form},issueRequest:()=>sent++},preventDefault:()=>cancelled++};
+listeners['htmx:confirm'](event);assert.equal(sent,0);assert.equal(cancelled,1);
+accepted=true;listeners['htmx:confirm'](event);assert.equal(sent,1);
+const legacy=fs.readFileSync('public/app.js','utf8').split('\n').find(line=>line.startsWith('async function bulkAssign()'));
+let calls=0,updated=0;
+const context={$$:()=>items,confirm:()=>false,updateBulkSelection:()=>updated++,api:()=>calls++};vm.createContext(context);vm.runInContext(legacy,context);
+vm.runInContext('bulkAssign()',context).then(()=>{assert.equal(calls,0);assert.equal(updated,1);console.log('PASS: HTMX and legacy cancel send no mutation; HTMX approval sends one request')}).catch(error=>{console.error(error);process.exitCode=1});

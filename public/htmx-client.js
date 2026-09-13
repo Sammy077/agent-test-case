@@ -13,3 +13,10 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-back]')
 document.addEventListener('change',event=>{if(event.target.matches('.case-select'))updateSelection()});
 document.addEventListener('DOMContentLoaded',()=>{syncPageMode(location.href);setupNavigation()});
 document.addEventListener('htmx:afterSwap',event=>{syncPageMode(event.detail.xhr?.responseURL||location.href);setupCountdown();setupNavigation();updateSelection()});
+
+function assignmentWarning(form){
+ const current=form.id==='bulk-form'?[...document.querySelectorAll('.case-select:checked')].map(x=>x.dataset.currentTester).filter(Boolean):[form.dataset.assignmentConfirm].filter(Boolean);
+ return current.length?'Already assigned:\n'+current.join('\n')+'\nReplace existing tester assignment(s)?':'';
+}
+document.addEventListener('htmx:confirm',event=>{const form=event.detail.elt.closest('form');if(!form||!(form.id==='bulk-form'||form.hasAttribute('data-assignment-confirm')))return;const message=assignmentWarning(form);if(!message)return;event.preventDefault();if(window.confirm(message))event.detail.issueRequest(true)});
+document.addEventListener('submit',event=>{if(window.htmx)return;const form=event.target;if(!(form.id==='bulk-form'||form.hasAttribute('data-assignment-confirm')))return;const message=assignmentWarning(form);if(message&&!window.confirm(message))event.preventDefault()});

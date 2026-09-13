@@ -588,6 +588,12 @@ async function actions(req,res,url){
   else if(url.pathname.match(/^\/actions\/assignments\/\d+\/review$/)){apiPath='/api/assignments/'+url.pathname.split('/')[3]+'/qa-review';method='PUT'}
   else if(url.pathname.match(/^\/actions\/defects\/\d+$/)){apiPath='/api/defects/'+url.pathname.split('/')[3]+'/status';method='PUT'}
   else return html(res,404,'<section class="notice error">Action not found</section>');
+  if(!hx&&form.confirmed!=='1'&&(apiPath==='/api/test-cases/assignments'||/^\/api\/test-cases\/\d+\/assignment$/.test(apiPath))){
+    const user=requireRole(req,res,['ADMIN']);if(!user)return;if(form._csrf!==user.csrf)return html(res,403,'Invalid security token');
+    const ids=apiPath.endsWith('/assignments')?payload.caseIds:[Number(apiPath.split('/')[3])];
+    const current=ids.map(id=>db.prepare('SELECT tc.case_code,tc.source_case_id,p.code,p.name FROM assignments a JOIN test_cases tc ON tc.id=a.test_case_id JOIN participants p ON p.id=a.participant_id WHERE tc.id=?').get(id)).filter(Boolean);
+    if(current.length){const hidden=Object.entries(form).flatMap(([key,value])=>[].concat(value).map(v=>'<input type="hidden" name="'+views.esc(key)+'" value="'+views.esc(v)+'">')).join(''),content='<section class="card"><h2>Confirm reassignment</h2><div class="form"><p>Already assigned:</p>'+current.map(x=>'<p>'+views.esc((x.source_case_id||x.case_code)+' → '+x.code+' · '+x.name)+'</p>').join('')+'<p>Replace existing tester assignments?</p><form method="post" action="'+views.esc(url.pathname)+'">'+hidden+'<input type="hidden" name="confirmed" value="1"><button>Confirm assignment</button><a class="btn alt" href="/admin">Cancel</a></form></div></section>';return html(res,200,views.document({title:'Confirm reassignment',user,path:'/admin',content}))}
+  }
   const response=await proxyApi(req,apiPath,method,payload,contentType,form._csrf),data=await response.json().catch(()=>({}));
   if(!response.ok){const content='<section class="notice error"><b>'+views.esc(data.error||'Request failed')+'</b>'+((data.errors||[]).map(x=>'<p>'+views.esc((x.sheet?x.sheet+' ':'')+(x.row?'row '+x.row+' ':'')+(x.field||'')+': '+x.message)+'</p>').join(''))+'</section>';return html(res,response.status,hx?content:views.document({title:'Request error',user:auth(req),path:actionDestination(url.pathname),content}))}
   const target=url.pathname==='/actions/import-production'?'/admin?channel='+encodeURIComponent(data.channel):actionDestination(url.pathname);if(hx)return html(res,204,'',{'HX-Redirect':target});return redirect(res,target);
