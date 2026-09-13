@@ -1,6 +1,6 @@
 # Disposable Vercel demo
 
-This deployment uses SQLite in memory. Each function instance starts with 150 synthetic cases. Uploads, account creation, tester links and result changes can disappear on restart and differ between instances. Seeded login cookies work across instances; newly created accounts require the instance that created them. Use synthetic/demo files only.
+This deployment uses SQLite in memory. Each function instance starts empty with Administrator account only. Uploads, account creation, tester links and result changes can disappear on restart and differ between instances. Administrator login cookies work across instances; newly created accounts require the instance that created them. Use synthetic/demo files only.
 
 ## Deploy
 
@@ -18,15 +18,12 @@ This deployment uses SQLite in memory. Each function instance starts with 150 sy
 | Role | Username | Password |
 |---|---|---|
 | Administrator | admin | Admin@123 |
-| Observer | observer01 | Observer@123 |
-| Manager | manager01 | Manager@123 |
-| TV display | display01 | Display@123 |
-| QA Lead | qalead | QA@123 |
-| Technical | tech | Tech@123 |
-| Agent | agent01 | Agent@123 |
-| Branch | branch01 | Branch@123 |
 
-Observer initially owns A01 and B01. Seeded passwords are public demo credentials, not production credentials.
+Initial admin password is public demo credential. Create required accounts and testers through Administration; upload production samples by channel. Observer TV reports cover all testers; editing remains limited to linked testers.
+
+## Local fresh start
+
+Run `npm run reset:local` once, then restart server. Command creates integrity-checked SQLite backup under `data/backups`, preserves existing Administrator credentials, removes tests, participants and non-admin accounts, and records reset. Startup never runs reset or recreates samples. Local disk-backed data imported afterward persists across restarts. `SEED_DEMO_DATA` no longer enables sample records.
 
 ## Verify
 

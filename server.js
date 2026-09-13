@@ -137,41 +137,7 @@ if(duplicateAssignments)throw new Error('Cannot enforce one agent per test case:
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_assignments_one_agent_per_case ON assignments(test_case_id)');
 
 const hash=p=>crypto.pbkdf2Sync(p,'ptc-v1',120000,32,'sha256').toString('hex');
-function seedUsers(){
-  if(db.prepare('SELECT COUNT(*) c FROM users').get().c)return;
-  const add=db.prepare('INSERT OR IGNORE INTO users(username,password_hash,role,display_name) VALUES(?,?,?,?)');
-  [['admin','Admin@123','ADMIN','System Admin'],['qalead','QA@123','QA_LEAD','QA Lead'],['tech','Tech@123','TECH','Technical Support'],['agent01','Agent@123','AGENT','Agent A01'],['branch01','Branch@123','BRANCH','Bokor Branch']].forEach(u=>add.run(u[0],hash(u[1]),u[2],u[3]));
-  const addP=db.prepare('INSERT OR IGNORE INTO participants(code,name,type,observer) VALUES(?,?,?,?)');
-  const names=['Sokha','Vuthy','Makara','Pisey','Rany','Vanna','Davy','Leakena','Sopheak','Kunthea','Lina','Rithy','Sovann','Bopha','Dara','Chantha','Sreyneang','Vicheka','Sothea','Mony'];
-  names.forEach((n,i)=>addP.run('A'+String(i+1).padStart(2,'0'),n,'AGENT','Observer '+String(i+1).padStart(2,'0')));
-  ['Bokor','Olympic','Siem Reap','Battambang','Takeo','Kampong Cham','Sihanoukville','Sen Sok','Toul Kork','Chbar Ampov'].forEach((n,i)=>addP.run('B'+String(i+1).padStart(2,'0'),n+' Branch','BRANCH','Branch Observer '+(i+1)));
-}
-function seedDemoData(){
-  if((!DEMO_MODE&&process.env.SEED_DEMO_DATA!=='true')||db.prepare('SELECT COUNT(*) c FROM test_cases').get().c)return;
-  const tc=db.prepare("INSERT INTO test_cases(case_code,title,process,priority,steps,expected_result,status,qa_status,channel) VALUES(?,?,?,?,?,?,?,?,?)");
-  const asn=db.prepare('INSERT INTO assignments(test_case_id,participant_id,sequence_no,status) VALUES(?,?,?,?)');
-  const people=db.prepare('SELECT id FROM participants ORDER BY id').all();
-  for(let i=1;i<=150;i++){
-    const process=['Payment','Cash Out','Registration','Account','Transfer'][i%5];
-    const priority=i<=20?1:i<=60?2:3;
-    const status=i<=93?'COMPLETED':i<=100?'FAILED':i<=104?'BLOCKED':i<=125?'IN_PROGRESS':'NOT_STARTED';
-    const qa=status==='COMPLETED'?'PASSED':status==='FAILED'?'FAILED':status==='BLOCKED'?'BLOCKED':'PENDING';
-    const row=tc.run(process.slice(0,3).toUpperCase()+'-'+String(i).padStart(3,'0'),process+' production validation '+i,process,priority,'Execute approved test steps','Transaction completes and is visible in reporting',status,qa,'Demo');
-    const assignment=asn.run(row.lastInsertRowid,people[(i-1)%people.length].id,i,status);
-    if(status==='FAILED')db.prepare("INSERT INTO defects(assignment_id,severity,status,owner) VALUES(?,?,?,?)").run(assignment.lastInsertRowid,i<96?'CRITICAL':'HIGH','INVESTIGATING','Technical Team');
-  }
-}
-seedUsers();
-db.prepare("UPDATE users SET participant_id=(SELECT id FROM participants WHERE code='A01' AND active=1) WHERE username='agent01' AND role='AGENT' AND participant_id IS NULL").run();
-db.prepare("UPDATE users SET participant_id=(SELECT id FROM participants WHERE code='B01' AND active=1) WHERE username='branch01' AND role='BRANCH' AND participant_id IS NULL").run();
-seedDemoData();
-
-if(DEMO_MODE){
- const add=db.prepare('INSERT OR IGNORE INTO users(username,password_hash,role,display_name) VALUES(?,?,?,?)');
- [['observer01','Observer@123','OBSERVER','Demo Observer'],['manager01','Manager@123','MANAGER','Demo Manager'],['display01','Display@123','DISPLAY','Demo Display']].forEach(u=>add.run(u[0],hash(u[1]),u[2],u[3]));
- const observer=db.prepare("SELECT id FROM users WHERE username='observer01'").get();
- for(const code of ['A01','B01'])db.prepare('INSERT OR IGNORE INTO observer_participants(observer_user_id,participant_id) SELECT ?,id FROM participants WHERE code=?').run(observer.id,code);
-}
+if(!db.prepare("SELECT id FROM users WHERE role='ADMIN'").get())db.prepare('INSERT INTO users(username,password_hash,role,display_name) VALUES(?,?,?,?)').run('admin',hash('Admin@123'),'ADMIN','System Admin');
 function sessionKey(sid,session){
  if(!DEMO_MODE)return sid;
  const payload=Buffer.from(JSON.stringify(session)).toString('base64url');return payload+'.'+crypto.createHmac('sha256',SECRET).update(payload).digest('base64url');
@@ -185,7 +151,9 @@ function json(res,status,data){res.writeHead(status,{'Content-Type':'application
 function readBody(req,limit=5e6){if(req.body!==undefined){const raw=Buffer.isBuffer(req.body)?req.body:Buffer.from(typeof req.body==='string'?req.body:JSON.stringify(req.body));return raw.length>limit?Promise.reject(Object.assign(Error('Payload too large'),{status:413})):Promise.resolve(raw)}return new Promise((resolve,reject)=>{const chunks=[];let size=0,settled=false;req.on('data',chunk=>{if(settled)return;size+=chunk.length;if(size>limit){settled=true;reject(Object.assign(Error('Payload too large'),{status:413}));req.destroy();return}chunks.push(chunk)});req.on('end',()=>{if(!settled)resolve(Buffer.concat(chunks))});req.on('error',error=>{if(!settled)reject(error)})})}
 async function bodyJson(req,limit=5e6){const raw=await readBody(req,limit);return JSON.parse(raw.toString('utf8')||'{}')}
 function parseCookies(req){return Object.fromEntries((req.headers.cookie||'').split(';').filter(Boolean).map(x=>{const i=x.indexOf('=');return [x.slice(0,i).trim(),decodeURIComponent(x.slice(i+1))]}))}
-function auth(req){const sid=parseCookies(req).ptc_session,s=sessions.get(sid)||demoSession(sid);if(!s||s.exp<Date.now()){if(sid)sessions.delete(sid);return null}return s}
+let resetToken=db.prepare("SELECT details FROM audit_log WHERE action='FRESH_START_RESET' ORDER BY id DESC LIMIT 1").get()?.details;
+function refreshSessions(){if(!DEMO_MODE){const current=db.prepare("SELECT details FROM audit_log WHERE action='FRESH_START_RESET' ORDER BY id DESC LIMIT 1").get()?.details;if(current!==resetToken){sessions.clear();resetToken=current}}}
+function auth(req){refreshSessions();const sid=parseCookies(req).ptc_session,s=sessions.get(sid)||demoSession(sid);if(!s||s.exp<Date.now()){if(sid)sessions.delete(sid);return null}return s}
 function requireRole(req,res,roles){const u=auth(req);if(!u){json(res,401,{error:'Authentication required'});return null}if(roles&&!roles.includes(u.role)){json(res,403,{error:'Access denied'});return null}return u}
 function csrf(req,u){return req.headers['x-csrf-token']===u.csrf}
 function requireWrite(req,res,roles){const u=requireRole(req,res,roles);if(!u)return null;if(!csrf(req,u)){json(res,403,{error:'Invalid security token'});return null}return u}
@@ -236,7 +204,7 @@ function summary(){
 }
 
 function participantTvSummary(user,type){
-  const privileged=['ADMIN','QA_LEAD','MANAGER','DISPLAY'].includes(user.role);
+  const privileged=['ADMIN','QA_LEAD','MANAGER','DISPLAY','OBSERVER'].includes(user.role);
   const participantOnly=['AGENT','BRANCH'].includes(user.role);
   if(!privileged&&!participantOnly)return null;
   if(participantOnly&&user.role!==type)return null;
@@ -393,9 +361,10 @@ async function api(req,res,url){
     const nl=String.fromCharCode(10);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write('event: connected'+nl+'data: {}'+nl+nl);clients.add(res);req.on('close',()=>clients.delete(res));return;
   }
   if(url.pathname==='/api/dashboard'){
-    const u=requireRole(req,res,['MANAGER','DISPLAY','ADMIN','QA_LEAD']);if(!u)return;
+    const u=requireRole(req,res,['MANAGER','DISPLAY','ADMIN','QA_LEAD','OBSERVER']);if(!u)return;
     return json(res,200,summary());
   }
+  if(url.pathname==='/api/tv/technical'&&req.method==='GET'){const u=requireRole(req,res,['QA_LEAD','TECH','ADMIN','MANAGER','DISPLAY','OBSERVER']);if(u)return json(res,200,defectData(url));return}
   if(url.pathname==='/api/tv/participants'&&req.method==='GET'){
     const u=requireRole(req,res);if(!u)return;
     const type=cleanText(url.searchParams.get('type')).toUpperCase();
@@ -537,7 +506,7 @@ async function api(req,res,url){
 
 function html(res,status,content,headers={}){res.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",...headers});res.end(content)}
 function redirect(res,location){res.writeHead(303,{Location:location,'Cache-Control':'no-store'});res.end()}
-function pageRole(pathname){if(pathname==='/observer')return ['OBSERVER'];if(pathname==='/admin')return ['ADMIN'];if(pathname==='/qa')return ['QA_LEAD','TECH','ADMIN','OBSERVER'];if(pathname==='/tv/management')return ['MANAGER','DISPLAY','ADMIN','QA_LEAD'];if(pathname==='/tv/technical')return ['QA_LEAD','TECH','ADMIN','MANAGER','DISPLAY'];return null}
+function pageRole(pathname){if(pathname==='/observer')return ['OBSERVER'];if(pathname==='/admin')return ['ADMIN'];if(pathname==='/qa')return ['QA_LEAD','TECH','ADMIN','OBSERVER'];if(pathname==='/tv/management')return ['MANAGER','DISPLAY','ADMIN','QA_LEAD','OBSERVER'];if(pathname==='/tv/technical')return ['QA_LEAD','TECH','ADMIN','MANAGER','DISPLAY','OBSERVER'];return null}
 function assignmentsData(user,url){if(user.role==='OBSERVER')return observerAssignments(user,url,true);
   const participantScoped=['AGENT','BRANCH','OBSERVER'].includes(user.role),code=user.participantId?'':cleanText(url.searchParams.get('participant')),filter=channelWhere(url);
   if(participantScoped&&!user.participantId||!user.participantId&&!code)return {items:[],availableChannels:[]};
@@ -617,7 +586,7 @@ async function actions(req,res,url){
 function file(res,filePath,type='text/html'){fs.readFile(filePath,(error,data)=>{if(error){res.writeHead(404);return res.end('Not found')}res.writeHead(200,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"});res.end(data)})}
 const routes={'/observer':'index.html','/':'index.html','/login':'index.html','/app':'index.html','/admin':'index.html','/qa':'index.html','/my-tests':'index.html','/tv/management':'index.html','/tv/technical':'index.html','/tv/agents':'index.html','/tv/branches':'index.html','/scan':'index.html'};
 const staticAssets=Object.freeze({'/app.js':['app.js','text/javascript; charset=utf-8'],'/htmx-client.js':['htmx-client.js','text/javascript; charset=utf-8'],'/vendor/htmx-2.0.10.min.js':['vendor/htmx-2.0.10.min.js','text/javascript; charset=utf-8'],'/vendor/htmx-ext-sse-2.2.4.js':['vendor/htmx-ext-sse-2.2.4.js','text/javascript; charset=utf-8'],'/vendor/htmx-ext-response-targets-2.0.4.js':['vendor/htmx-ext-response-targets-2.0.4.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/brand.css':['brand.css','text/css; charset=utf-8'],'/wing-logo.svg':['wing-logo.svg','image/svg+xml'],'/brand-background.png':['brand-background.png','image/png'],'/brand-background.jpg':['brand-background.jpg','image/jpeg'],'/brand-background.webp':['brand-background.webp','image/webp'],'/brand-background.svg':['brand-background.svg','image/svg+xml']});
-const requestHandler=async(req,res)=>{try{const url=new URL(req.url,BASE_URL);if(url.pathname.startsWith('/api/'))return await api(req,res,url);if(url.pathname.startsWith('/actions/')&&req.method==='POST')return await actions(req,res,url);if(url.pathname==='/scan'){const id=verifyQr(url.searchParams.get('token')||''),participant=id&&db.prepare('SELECT id,code,name,type FROM participants WHERE id=? AND active=1').get(id);if(!participant){res.writeHead(403);return res.end('QR code is invalid, expired or inactive')}const sid=crypto.randomBytes(32).toString('base64url'),session={id:'participant:'+participant.id,username:'qr:'+participant.code,role:participant.type,name:participant.name,participantId:participant.id,participantCode:participant.code,csrf:crypto.randomBytes(20).toString('hex'),exp:Date.now()+28800000};const key=sessionKey(sid,session);if(!DEMO_MODE)sessions.set(key,session);res.setHeader('Set-Cookie',`ptc_session=${key}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${COOKIE_SECURE?'; Secure':''}`);if(FRONTEND_MODE==='htmx'){const target=new URL('/my-tests',BASE_URL),content=views.myTests(assignmentsData(session,target),session,'');return html(res,200,views.document({title:'My assigned test cases',user:session,path:'/my-tests',content}))}}if(FRONTEND_MODE==='htmx'&&(url.pathname==='/'||url.pathname==='/app')){const user=auth(req);return redirect(res,user?serverHome(user):'/login')}if(FRONTEND_MODE==='htmx'&&routes[url.pathname]&&url.pathname!=='/scan')return renderHtmxPage(req,res,url);if(FRONTEND_MODE!=='htmx'&&routes[url.pathname]&&!['/','/app','/login','/scan'].includes(url.pathname)){const user=auth(req);if(!user)return redirect(res,'/login?return='+encodeURIComponent(url.pathname+url.search));const roles=pageRole(url.pathname);if(roles&&!roles.includes(user.role))return html(res,403,'<section class="notice error">Access denied</section>')}if(routes[url.pathname])return file(res,path.join(PUBLIC,routes[url.pathname]));if(Object.hasOwn(staticAssets,url.pathname)){const [name,type]=staticAssets[url.pathname];return file(res,path.join(PUBLIC,name),type)}res.writeHead(404);res.end('Not found')}catch(error){if(!error.status)console.error(error);if(!res.headersSent){if(String(req.headers.accept||'').includes('text/html'))html(res,error.status||500,'<section class="notice error">'+views.esc(error.status?error.message:'Internal server error')+'</section>');else json(res,error.status||500,{error:error.status?error.message:'Internal server error'})}}};
+const requestHandler=async(req,res)=>{try{refreshSessions();const url=new URL(req.url,BASE_URL);if(url.pathname.startsWith('/api/'))return await api(req,res,url);if(url.pathname.startsWith('/actions/')&&req.method==='POST')return await actions(req,res,url);if(url.pathname==='/scan'){const id=verifyQr(url.searchParams.get('token')||''),participant=id&&db.prepare('SELECT id,code,name,type FROM participants WHERE id=? AND active=1').get(id);if(!participant){res.writeHead(403);return res.end('QR code is invalid, expired or inactive')}const sid=crypto.randomBytes(32).toString('base64url'),session={id:'participant:'+participant.id,username:'qr:'+participant.code,role:participant.type,name:participant.name,participantId:participant.id,participantCode:participant.code,csrf:crypto.randomBytes(20).toString('hex'),exp:Date.now()+28800000};const key=sessionKey(sid,session);if(!DEMO_MODE)sessions.set(key,session);res.setHeader('Set-Cookie',`ptc_session=${key}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${COOKIE_SECURE?'; Secure':''}`);if(FRONTEND_MODE==='htmx'){const target=new URL('/my-tests',BASE_URL),content=views.myTests(assignmentsData(session,target),session,'');return html(res,200,views.document({title:'My assigned test cases',user:session,path:'/my-tests',content}))}}if(FRONTEND_MODE==='htmx'&&(url.pathname==='/'||url.pathname==='/app')){const user=auth(req);return redirect(res,user?serverHome(user):'/login')}if(FRONTEND_MODE==='htmx'&&routes[url.pathname]&&url.pathname!=='/scan')return renderHtmxPage(req,res,url);if(FRONTEND_MODE!=='htmx'&&routes[url.pathname]&&!['/','/app','/login','/scan'].includes(url.pathname)){const user=auth(req);if(!user)return redirect(res,'/login?return='+encodeURIComponent(url.pathname+url.search));const roles=pageRole(url.pathname);if(roles&&!roles.includes(user.role))return html(res,403,'<section class="notice error">Access denied</section>')}if(routes[url.pathname])return file(res,path.join(PUBLIC,routes[url.pathname]));if(Object.hasOwn(staticAssets,url.pathname)){const [name,type]=staticAssets[url.pathname];return file(res,path.join(PUBLIC,name),type)}res.writeHead(404);res.end('Not found')}catch(error){if(!error.status)console.error(error);if(!res.headersSent){if(String(req.headers.accept||'').includes('text/html'))html(res,error.status||500,'<section class="notice error">'+views.esc(error.status?error.message:'Internal server error')+'</section>');else json(res,error.status||500,{error:error.status?error.message:'Internal server error'})}}};
 const server=http.createServer(requestHandler);
 if(!SERVERLESS)server.listen(PORT,HOST,()=>console.log('Production Test Center listening on '+BASE_URL));
 module.exports={requestHandler,server,db,cleanText,statusValue,normalizeProductionStatus,PRODUCTION_STATUSES,WORKFLOW_STATES,parseWorkbook,summary,signedQr};
