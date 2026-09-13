@@ -1,0 +1,13 @@
+data/
+node_modules/
+.agents/
+.codex/
+tests/
+test.js
+docs/
+*.xlsx
+*.db
+*.db-wal
+*.db-shm
+.env
+.env.*

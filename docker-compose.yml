@@ -1,0 +1,13 @@
+services:
+  production-test-center:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      BASE_URL: "http://CHANGE_TO_INTERNAL_SERVER_IP:8080"
+      APP_SECRET: "CHANGE_TO_A_LONG_RANDOM_SECRET"
+      COOKIE_SECURE: "false"
+      SEED_DEMO_DATA: "false"
+    volumes:
+      - ./data:/app/data

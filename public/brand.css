@@ -1,0 +1,59 @@
+/*
+ * WING SLIDE BACKGROUND — SHARED APP THEME
+ * Background: original image1.png from the user's POS_Final_Presentation.pptx.
+ * The artwork is bundled unchanged as brand-background.png.
+ * Logo colours remain from the public wb-logo.svg reference.
+ * See BRANDING.md. All assets are local; no runtime CDN or web-font requests.
+ */
+:root {
+  --wing-green: #abd037;
+  --wing-blue: #0077ff;
+  --wing-ink: #0b1e2b;
+  --wing-white: #ffffff;
+  --brand-font: "Segoe UI", Arial, sans-serif;
+  --brand-background-image: url('/brand-background.png');
+  --brand-background-opacity: 1;
+
+  --bg: #f1f5f8;
+  --panel: #ffffff;
+  --surface: #f6f8fb;
+  --line: #d5e0e8;
+  --text: var(--wing-ink);
+  --muted: #526577;
+  --action: #005bc4;
+  --action-hover: #004a9e;
+  --focus: #005bc4;
+  --green: #11653f;
+  --green-bg: #e8f6ec;
+  --red: #b12739;
+  --red-bg: #fff0f1;
+  --amber: #835100;
+  --amber-bg: #fff5d9;
+  --purple: #6b3b9e;
+  --purple-bg: #f4ecff;
+  --blue: #075db2;
+  --blue-bg: #eaf2ff;
+  --neutral-bg: #e9eef3;
+  --shadow: 0 1px 2px rgb(11 30 43 / 4%), 0 4px 12px rgb(11 30 43 / 6%), 0 12px 32px rgb(11 30 43 / 4%);
+}
+body.tv {
+  --bg: #0b1e2b;
+  --panel: #122b3c;
+  --surface: #173344;
+  --line: #345163;
+  --text: #f5f9fc;
+  --muted: #b5c8d6;
+  --focus: var(--wing-green);
+  --green: #a2e8bd;
+  --green-bg: #173e32;
+  --red: #ffa7b0;
+  --red-bg: #462c37;
+  --amber: #ffdb8d;
+  --amber-bg: #443c28;
+  --purple: #d9b6ff;
+  --purple-bg: #3c3054;
+  --blue: #a6ceff;
+  --blue-bg: #1b3b5b;
+  --neutral-bg: #294353;
+  --shadow: none;
+}

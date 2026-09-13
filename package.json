@@ -1,0 +1,19 @@
+{
+  "name": "production-test-center",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js",
+    "test:demo": "node tests/vercel-demo.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
+  }
+}
