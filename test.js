@@ -1,4 +1,5 @@
 'use strict';
+process.env.NODE_ENV='test';
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),ExcelJS=require('exceljs');
 const {DatabaseSync}=require('node:sqlite');
 const {spawnSync}=require('node:child_process');

@@ -1,4 +1,5 @@
 'use strict';
+process.env.NODE_ENV='test';
 process.env.APP_SECRET='demo-test-secret';
 const assert=require('node:assert/strict');
 const {Readable,Writable}=require('node:stream');

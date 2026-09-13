@@ -4,7 +4,7 @@ const http=require('node:http');
 const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
-const {DatabaseSync}=require('node:sqlite');
+const {openDatabase}=require('./lib/database');
 const ExcelJS=require('exceljs');
 const QRCode=require('./vendor/qrcode');
 const {parseProductionWorkbook}=require('./lib/production-workbook');
@@ -25,10 +25,10 @@ const XLSX_ROW_LIMIT=10000;
 const FRONTEND_MODE=process.env.FRONTEND_MODE||'htmx';
 
 const DB_PATH=DEMO_MODE?':memory:':process.env.DB_FILE||path.join(ROOT,'data','test-center.db');
-if(DB_PATH!==':memory:')fs.mkdirSync(path.dirname(DB_PATH),{recursive:true});
-const db=new DatabaseSync(DB_PATH);
+const {db,shared:SHARED_DATABASE}=openDatabase({localPath:DB_PATH});
+if(!SHARED_DATABASE)db.exec('PRAGMA journal_mode=WAL');
 db.exec(`
-PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
+PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL,display_name TEXT NOT NULL,active INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS participants(id INTEGER PRIMARY KEY,code TEXT UNIQUE NOT NULL,name TEXT NOT NULL,type TEXT NOT NULL CHECK(type IN ('AGENT','BRANCH')),observer TEXT,active INTEGER DEFAULT 1,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS test_cases(id INTEGER PRIMARY KEY,case_code TEXT UNIQUE NOT NULL,title TEXT NOT NULL,process TEXT NOT NULL,priority INTEGER NOT NULL DEFAULT 3,steps TEXT,expected_result TEXT,status TEXT NOT NULL DEFAULT 'NOT_STARTED',qa_status TEXT NOT NULL DEFAULT 'PENDING',created_at TEXT DEFAULT CURRENT_TIMESTAMP);
@@ -39,7 +39,11 @@ CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,
 
 function addColumn(table,name,definition){
   const columns=db.prepare('PRAGMA table_info('+table+')').all().map(row=>row.name);
-  if(!columns.includes(name))db.exec('ALTER TABLE '+table+' ADD COLUMN '+name+' '+definition);
+  if(!columns.includes(name)){
+    try{db.exec('ALTER TABLE '+table+' ADD COLUMN '+name+' '+definition)}catch(error){
+      if(!db.prepare('PRAGMA table_info('+table+')').all().some(row=>row.name===name)||!String(error.message).toLowerCase().includes('duplicate column'))throw error;
+    }
+  }
 }
 addColumn('test_cases','channel',"TEXT NOT NULL DEFAULT 'Uncategorized'");
 addColumn('test_cases','case_type',"TEXT NOT NULL DEFAULT ''");
@@ -67,6 +71,7 @@ function migrateAssignmentsForUnassignedCases(){
   db.exec('PRAGMA foreign_keys=OFF');
   try{
     db.exec('BEGIN IMMEDIATE');
+    if(db.prepare('PRAGMA table_info(assignments)').all().find(column=>column.name==='participant_id')?.notnull===0){db.exec('COMMIT');return}
     db.exec(`CREATE TABLE assignments_next(
       id INTEGER PRIMARY KEY,
       test_case_id INTEGER NOT NULL,
@@ -137,7 +142,7 @@ if(duplicateAssignments)throw new Error('Cannot enforce one agent per test case:
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_assignments_one_agent_per_case ON assignments(test_case_id)');
 
 const hash=p=>crypto.pbkdf2Sync(p,'ptc-v1',120000,32,'sha256').toString('hex');
-if(!db.prepare("SELECT id FROM users WHERE role='ADMIN'").get())db.prepare('INSERT INTO users(username,password_hash,role,display_name) VALUES(?,?,?,?)').run('admin',hash('Admin@123'),'ADMIN','System Admin');
+if(!db.prepare("SELECT id FROM users WHERE role='ADMIN'").get())db.prepare('INSERT OR IGNORE INTO users(username,password_hash,role,display_name) VALUES(?,?,?,?)').run('admin',hash('Admin@123'),'ADMIN','System Admin');
 function sessionKey(sid,session){
  if(!DEMO_MODE)return sid;
  const payload=Buffer.from(JSON.stringify(session)).toString('base64url');return payload+'.'+crypto.createHmac('sha256',SECRET).update(payload).digest('base64url');
@@ -422,7 +427,7 @@ async function api(req,res,url){
     broadcast('refresh',{scope:'all'});return json(res,200,{...summary,excludedSheets:parsed.excludedSheets});
   }
   if(url.pathname==='/api/test-cases/replace-production'&&req.method==='POST'){
-    const u=requireWrite(req,res,['ADMIN']);if(!u)return;if(DEMO_MODE)return json(res,400,{error:'Full database replacement unavailable in demo. Use production sample upload by channel.'});
+    const u=requireWrite(req,res,['ADMIN']);if(!u)return;if(DEMO_MODE||SHARED_DATABASE)return json(res,400,{error:'Full database replacement unavailable in serverless/shared storage. Use production sample upload by channel.'});
     try{
       const payload=await bodyJson(req,28*1024*1024);
       if(payload.confirmation!=='REPLACE 800 CASES')return json(res,400,{error:'Type REPLACE 800 CASES to confirm replacement'});

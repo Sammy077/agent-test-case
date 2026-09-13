@@ -9,10 +9,12 @@
     "start": "node server.js",
     "test": "node test.js",
     "test:demo": "node tests/vercel-demo.js",
-    "reset:local": "node scripts/reset-local.js"
+    "reset:local": "node scripts/reset-local.js",
+    "test:shared": "node tests/shared-database.js"
   },
   "dependencies": {
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "libsql": "^0.5.29"
   },
   "overrides": {
     "uuid": "11.1.1"
