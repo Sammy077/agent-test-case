@@ -27,9 +27,8 @@ const FRONTEND_MODE=process.env.FRONTEND_MODE||'htmx';
 
 const DB_PATH=DEMO_MODE?':memory:':process.env.DB_FILE||path.join(ROOT,'data','test-center.db');
 const {db,shared:SHARED_DATABASE}=openDatabase({localPath:DB_PATH});
-// Concurrent cold starts may add columns together; wait for transient schema/write locks.
-db.exec('PRAGMA busy_timeout=30000');
-if(!SHARED_DATABASE)db.exec('PRAGMA journal_mode=WAL');
+// Hosted Turso manages locks/journaling and rejects these local SQLite PRAGMAs.
+if(!SHARED_DATABASE){db.exec('PRAGMA busy_timeout=30000');db.exec('PRAGMA journal_mode=WAL')}
 db.exec(`
 PRAGMA foreign_keys=ON;
 CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,username TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,role TEXT NOT NULL,display_name TEXT NOT NULL,active INTEGER DEFAULT 1);
