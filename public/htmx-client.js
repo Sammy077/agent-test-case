@@ -13,6 +13,8 @@ document.addEventListener('click',event=>{if(event.target.closest('[data-back]')
 document.addEventListener('change',event=>{if(event.target.matches('.case-select'))updateSelection()});
 document.addEventListener('DOMContentLoaded',()=>{syncPageMode(location.href);setupNavigation()});
 document.addEventListener('htmx:afterSwap',event=>{syncPageMode(event.detail.xhr?.responseURL||location.href);setupCountdown();setupNavigation();updateSelection()});
+// Capture before HTMX handles the form change so disabled Order By is enabled in time.
+document.addEventListener('change',event=>{if(event.target.name!=='sortBy')return;const order=event.target.closest('form')?.querySelector('[name="orderBy"]');if(order)order.disabled=event.target.value==='default'},true);
 
 function assignmentWarning(form){
  const current=form.id==='bulk-form'?[...document.querySelectorAll('.case-select:checked')].map(x=>x.dataset.currentTester).filter(Boolean):[form.dataset.assignmentConfirm].filter(Boolean);

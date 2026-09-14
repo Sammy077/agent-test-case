@@ -85,7 +85,11 @@ These known defaults are automatically seeded in server.js and must be removed/r
 
 Manual case creation remains absent. Administration accepts `.xlsx` workbooks following the production channel sheets. Case assignment is managed separately in Administration; participant code is not required in imported workbooks. Priority uses 1=Critical, 2=High, 3=Medium and 4=Low.
 
-The complete workbook is validated before an atomic import. Each Case ID has at most one assigned participant, while one participant can receive many test cases. Repeat imports update cases without duplication. Administrators assign or reassign cases while status is Not Executed. In **Test case assignments**, choose **Assignable only**, check required cases (or select all displayed cases), choose an agent in bulk-assignment bar, then select **Assign selected**. Previous and Next navigate larger case lists. Bulk requests are atomic: if any selected case has started, no selected case moves. Production workbook statuses are normalized; invisible Excel characters and excess whitespace are removed before matching.
+Complete workbook validation precedes atomic import. Production identity = channel + classification sheet + source Case ID; repeated IDs across classifications remain independently assignable. Each classified case allows one assigned participant; participants can receive many cases. `Group` + `MasterSheet` remain reference sheets, excluded from import and reported in import summary. Repeat imports refresh case metadata + source details while preserving assignments and saved execution/QA results. Administrators assign or reassign cases while status is Not Started. In **Test case assignments**, choose **Assignable only**, select cases, choose agent, then assign selected cases. Previous/Next navigate larger lists. Bulk requests remain atomic: started cases prevent entire reassignment.
+
+Optional workbook columns `Category` + `Type` import as nullable text, separate from existing `Case Type`. `Main Feature` + `Sub Feature` persist for filtering; existing records backfill from stored source details. Test details promote exact `Master`, `Commission`, `Fee` values, including zero; tier-specific Commission/Fee duplicates remain stored but hidden.
+
+Administrator case assignments + Observer **My Tests** support **Sort By**: Default, Case ID, Channel, Classification, Scenario, Priority, Assigned User, Main Feature, Sub Feature. **Order By** selects Ascending/Descending; Default retains existing ordering. Sorting runs server-side before existing pagination; blank values remain last. Observer **My Tests** additionally filters by Priority, Main Feature, Sub Feature alongside Channel; selected filters combine using AND within linked-tester scope. URLs preserve selections through reloads/actions. Clear filters preserves selected tester + sorting.
 
 Participant QR links create an eight-hour participant-scoped session and open that participant's complete assigned test-case queue. The session cannot update another participant's assignments.
 
@@ -100,6 +104,8 @@ The TV live badge reflects the authenticated event-stream connection. It is not 
 ## Verification scope
 
 npm test checks protected dashboard access, Manager/Display roles, direct Excel import and repeat-import reconciliation, one-agent-per-case assignment, participant QR queue access, atomic row validation, channel summaries and filters, UI markers, route delivery and CSP-safe assets.
+
+`npm run test:cases` checks classified import identity, reference exclusions, optional metadata, safe reimport, legacy database migration, both case renderers, scoped Observer filters, every sort field/direction, blanks/ties, pagination, and action return state.
 
 It does **not** prove camera-level QR scanning, complete observer/QA workflows, responsiveness on the physical TVs, load capacity or production readiness. Read PRODUCTION-GAPS.md before planning any production release.
 
