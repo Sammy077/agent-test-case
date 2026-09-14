@@ -11,6 +11,7 @@
     "test:demo": "node tests/vercel-demo.js",
     "reset:local": "node scripts/reset-local.js",
     "test:shared": "node tests/shared-database.js",
+    "test:production-status": "node tests/production-empty-status.js",
     "test:loading": "node tests/request-loading.js",
     "test:confirmation": "node tests/reassignment-confirmation.js"
   },
