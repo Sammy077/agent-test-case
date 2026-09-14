@@ -14,7 +14,7 @@
     "test:production-status": "node tests/production-empty-status.js",
     "test:loading": "node tests/request-loading.js",
     "test:confirmation": "node tests/reassignment-confirmation.js",
-    "test:cases": "node tests/classified-cases.js && node tests/case-metadata-migration.js && node tests/case-client.js && node tests/case-filters-sorting.js"
+    "test:cases": "node tests/classified-cases.js && node tests/case-metadata-migration.js && node tests/case-client.js && node tests/case-id-order.js && node tests/case-filters-sorting.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

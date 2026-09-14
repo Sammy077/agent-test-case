@@ -43,5 +43,22 @@ async function ids(query,user,endpoint='/api/my-assignments'){const {status,data
  const confirmation=await (await fetch(base+'/actions/test-cases/2/assignment',{method:'POST',headers:{Cookie:admin.cookie,'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({_csrf:admin.csrf,participantId:'3',_returnTo:adminReturn})})).text();assert.match(confirmation,/A · Gold/);assert.match(confirmation,/href="\/admin\?sortBy=priority&amp;orderBy=desc&amp;page=2">Cancel/);
  const assign=await fetch(base+'/actions/test-cases/2/assignment',{method:'POST',redirect:'manual',headers:{Cookie:admin.cookie,'Content-Type':'application/x-www-form-urlencoded','HX-Request':'true'},body:new URLSearchParams({_csrf:admin.csrf,participantId:'3',_returnTo:adminReturn})});assert.equal(assign.status,204);assert.equal(assign.headers.get('hx-redirect'),adminReturn);
  const external=await fetch(base+'/actions/test-cases/2/assignment',{method:'POST',redirect:'manual',headers:{Cookie:admin.cookie,'Content-Type':'application/x-www-form-urlencoded','HX-Request':'true'},body:new URLSearchParams({_csrf:admin.csrf,participantId:'2',_returnTo:'https://example.com/admin'})});assert.equal(external.status,204);assert.equal(external.headers.get('hx-redirect'),'/admin');
- console.log('PASS: Observer scope/filters, all sort fields/directions, blanks/ties, pagination, validation, rendered metadata/controls');
+ // Regression: sorting must still work with Channel + Sheet + Priority together.
+ for(const [index,sourceId]of ['TC-10','TC-2','TC-189','TC-190'].entries()){
+  insert.run('natural-'+index,sourceId,'Natural '+index,'',2,'Natural','1. Standard','Cash-In','QR',null,null);
+  db.prepare('UPDATE test_cases SET source_sheet=? WHERE id=?').run('1. Standard',index+6);
+  db.prepare('INSERT INTO assignments(test_case_id,participant_id) VALUES(?,1)').run(index+6);
+ }
+ const combined='channel=Natural&sheet=1.+Standard&priority=2&sortBy=caseId';
+ assert.deepEqual(await ids(combined+'&orderBy=asc',admin,'/api/test-cases'),[7,6,8,9]);
+ assert.deepEqual(await ids(combined+'&orderBy=desc',admin,'/api/test-cases'),[9,8,6,7]);
+ assert.deepEqual(await ids(combined+'&orderBy=asc&limit=2&offset=1',admin,'/api/test-cases'),[6,8]);
+ for(const direction of ['asc','desc']){
+  const expected=direction==='asc'?[7,6,8,9]:[9,8,6,7];
+  assert.deepEqual(await ids('channel=Natural&participantId=1&priority=2&sortBy=caseId&orderBy='+direction,observer),expected);
+  const html=await (await fetch(base+'/admin?'+combined+'&orderBy='+direction,{headers:{Cookie:admin.cookie,'HX-Request':'true'}})).text();
+  const shown=[...html.matchAll(/action="\/actions\/test-cases\/(\d+)\/assignment"/g)].map(match=>Number(match[1]));
+  assert.deepEqual(shown,expected);
+ }
+ console.log('PASS: Observer scope/filters, all sort fields/directions, blanks/ties, pagination, validation, rendered metadata/controls, combined-filter numeric sorting');
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{await new Promise(resolve=>server.close(resolve));db.close();fs.rmSync(directory,{recursive:true,force:true})});
