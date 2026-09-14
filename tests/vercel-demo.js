@@ -4,9 +4,9 @@ process.env.APP_SECRET='demo-test-secret';
 const assert=require('node:assert/strict');
 const {Readable,Writable}=require('node:stream');
 const handler=require('../api/demo');
-function request(url,method='GET',body='',cookie='',parsedBody){
+function request(url,method='GET',body='',cookie='',parsedBody,extraHeaders={}){
  return new Promise((resolve,reject)=>{
-  const req=Readable.from([Buffer.from(body)]);req.url=url;req.method=method;if(parsedBody!==undefined)req.body=parsedBody;req.headers={cookie,'content-type':'application/x-www-form-urlencoded'};
+  const req=Readable.from([Buffer.from(body)]);req.url=url;req.method=method;if(parsedBody!==undefined)req.body=parsedBody;req.headers={...extraHeaders,cookie,'content-type':'application/x-www-form-urlencoded'};
   const chunks=[],headers={};const res=new Writable({write(chunk,encoding,done){chunks.push(Buffer.from(chunk));done()}});
   res.setHeader=(key,value)=>headers[key.toLowerCase()]=value;res.writeHead=(status,values={})=>{res.statusCode=status;for(const [key,value]of Object.entries(values))res.setHeader(key,value)};
   res.on('finish',()=>resolve({status:res.statusCode,headers,body:Buffer.concat(chunks).toString()}));res.on('error',reject);Promise.resolve(handler(req,res)).catch(reject);
@@ -31,7 +31,13 @@ function request(url,method='GET',body='',cookie='',parsedBody){
  r=await request('/actions/observer/link','POST','participantId=2&_csrf='+encodeURIComponent(session.csrf),cookie);assert.equal(r.status,303);assert.equal(production.db.prepare('SELECT observer_user_id FROM observer_participants WHERE participant_id=2').get().observer_user_id,session.id);
  r=await request('/api/me','GET','',cookie+'tampered');assert.equal(r.status,401);
  assert.equal(production.db.prepare('PRAGMA database_list').get().file,'');
- r=await request('/style.css');assert.equal(r.status,200);
+ for(const asset of ['/style.css','/brand.css','/brand-background.png']){
+  r=await request(asset);assert.equal(r.status,200);assert.match(r.headers['cache-control'],/public, max-age=/);assert.ok(r.headers.etag);
+  const cached=await request(asset,'GET','','',undefined,{'if-none-match':r.headers.etag});assert.equal(cached.status,304);assert.equal(cached.body,'');
+ }
+ r=await request('/login');assert.equal(r.headers['cache-control'],'no-store');assert.match(r.body,/<link rel="preload" href="\/brand-background.png" as="image">/);
+ r=await request('/api/me','GET','',cookie);assert.equal(r.headers['cache-control'],'no-store');
+ assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname,'../public/index.html'),'utf8'),/<link rel="preload" href="\/brand-background.png" as="image">/);
  r=await request('/actions/login','POST','username=manager01&password=Manager%40123');assert.equal(r.status,303);r=await request('/tv/management','GET','',r.headers['set-cookie'].split(';')[0]);assert.equal(r.status,200);assert.match(r.body,/hx-trigger="every 10s"/);assert.doesNotMatch(r.body,/sse-connect=/);
  r=await request('/actions/login','POST','username=admin&password=Admin%40123');assert.equal(r.status,303);
  console.log('PASS: Vercel empty startup, explicit fixtures, port-free handler, form login, Observer page, static assets, finite events');production.db.close();
