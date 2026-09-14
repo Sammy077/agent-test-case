@@ -36,7 +36,7 @@ async function ids(query,user,endpoint='/api/my-assignments'){const {status,data
  const page=await (await fetch(base+'/my-tests?participantId=1&priority=4&sortBy=priority&orderBy=desc',{headers:{Cookie:observer.cookie}})).text();
  assert.match(page,/name="mainFeature"/);assert.match(page,/name="subFeature"/);assert.match(page,/name="sortBy"/);assert.match(page,/name="orderBy"/);assert.match(page,/Standard/);assert.doesNotMatch(page,/999/);assert.match(page,/>Commission<\/b>: 0/);
  assert.match(page,/_returnTo/);assert.match(page,/No tests match selected filters|Zulu/);
- const adminPage=await (await fetch(base+'/admin?sortBy=priority&orderBy=desc',{headers:{Cookie:admin.cookie}})).text();assert.match(adminPage,/name="sortBy"/);assert.match(adminPage,/name="orderBy"/);
+ const adminPage=await (await fetch(base+'/admin?sortBy=priority&orderBy=desc',{headers:{Cookie:admin.cookie}})).text();assert.match(adminPage,/name="sortBy"/);assert.match(adminPage,/name="orderBy"/);assert.match(adminPage,/<th>Classification<\/th>/);assert.match(adminPage,/<th>Unique Reference<\/th>/);assert.match(adminPage,/Alpha \/ Gold \/ A · #2/);
  const returnTo='/my-tests?participantId=1&priority=4&sortBy=priority&orderBy=desc';
  const start=await fetch(base+'/actions/assignments/1/start',{method:'POST',redirect:'manual',headers:{Cookie:observer.cookie,'Content-Type':'application/x-www-form-urlencoded','HX-Request':'true'},body:new URLSearchParams({_csrf:observer.csrf,_returnTo:returnTo})});assert.equal(start.status,204);assert.equal(start.headers.get('hx-redirect'),returnTo);
  const adminReturn='/admin?sortBy=priority&orderBy=desc&page=2';

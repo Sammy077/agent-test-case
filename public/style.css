@@ -109,7 +109,8 @@ label { display: block; font-size: 0.875rem; font-weight: 600; }
 .case-select, #select-page { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: var(--action); cursor: pointer; }
 .assignment-table .assignment-priority { width: 5.5rem; min-width: 5.5rem; white-space: nowrap; }
 .assignment-table .assignment-agent { width: 13rem; min-width: 13rem; }
-.assignment-table { min-width: 70rem; }
+.assignment-table { min-width: 90rem; }
+.assignment-table .case-reference { min-width: 16rem; max-width: 24rem; overflow-wrap: anywhere; }
 .assignment-table .assignment-status { width: 10rem; min-width: 10rem; white-space: nowrap; }
 .assignment-table .assignment-agent form { display: grid; gap: 0.5rem; }
 .assignment-table .assignment-agent select { margin: 0; }

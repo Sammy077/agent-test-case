@@ -7,6 +7,7 @@
  function sortControls(filters={},legacy=false){const key=filters.sortBy||'default';return select('Sort By','sortBy',fields,key,legacy)+select('Order By','orderBy',[['asc','Ascending'],['desc','Descending']],filters.orderBy||'asc',legacy,key==='default')}
  function observerControls(data,legacy=false){const f=data.filters||{};return select('Priority','priority',[['','All priorities'],...[1,2,3,4].map(x=>[x,'Priority '+x])],f.priority||'',legacy)+select('Main Feature','mainFeature',[['','All main features'],...(data.availableMainFeatures||[]).map(x=>[x,x])],f.mainFeature||'',legacy)+select('Sub Feature','subFeature',[['','All sub features'],...(data.availableSubFeatures||[]).map(x=>[x,x])],f.subFeature||'',legacy)+sortControls(f,legacy)}
  function caseLabel(item){const id=item.source_case_id||item.case_code,classification=item.subcategory||item.source_sheet;return id+(classification?' · '+classification:'')}
+ function uniqueReference(item){const parts=[item.channel,item.subcategory||item.source_sheet,item.source_case_id||item.case_code].filter(value=>value!=null&&value!=='');return parts.join(' / ')+' · #'+(item.test_case_id||item.id)}
  function detailsHtml(item){
   const source=item.source_details||{},details={};
   for(const [key,title]of [['master','Master'],['commission','Commission'],['fee','Fee']])if(Object.hasOwn(source,key))details[title]=source[key];
@@ -20,5 +21,5 @@
  }
  function clearHref(filters={}){const params=new URLSearchParams();for(const key of ['participantId','participant','sortBy','orderBy'])if(filters[key])params.set(key,filters[key]);return '/my-tests'+(params.size?'?'+params:'')}
  function returnInput(path,filters={}){const params=new URLSearchParams(filters);return '<input type="hidden" name="_returnTo" value="'+esc(path+(params.size?'?'+params:''))+'">'}
- return {sortControls,observerControls,caseLabel,detailsHtml,clearHref,returnInput};
+ return {sortControls,observerControls,caseLabel,uniqueReference,detailsHtml,clearHref,returnInput};
 });
