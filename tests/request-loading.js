@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const listeners={},timers=new Map(),nodes=[];let timerId=0;
+const node=()=>({hidden:true,attrs:{},setAttribute(k,v){this.attrs[k]=v},removeAttribute(k){delete this.attrs[k]},isConnected:true});
+const button=node();button.disabled=false;
+const form={matches:()=>true,querySelectorAll:()=>[button],setAttribute:button.setAttribute.bind(button),removeAttribute:button.removeAttribute.bind(button)};
+const document={body:{appendChild:n=>nodes.push(n)},createElement:node,addEventListener:(name,fn)=>listeners[name]=fn};
+const window={};
+const source=fs.existsSync('public/request-loading.js')?fs.readFileSync('public/request-loading.js','utf8'):'';
+vm.runInNewContext(source,{document,window,WeakMap,setTimeout:fn=>{timers.set(++timerId,fn);return timerId},clearTimeout:id=>timers.delete(id)});
+assert.ok(window.requestLoading,'shared request loader exists');
+const flush=()=>{for(const fn of timers.values())fn();timers.clear()};
+const end=window.requestLoading.begin(form);assert.equal(button.disabled,true);assert.equal(nodes[0].hidden,true);end();flush();assert.equal(nodes[0].hidden,true);assert.equal(button.disabled,false);
+const first=window.requestLoading.begin(form),second=window.requestLoading.begin(form);flush();assert.equal(nodes[0].hidden,false);first();assert.equal(nodes[0].hidden,false);assert.equal(button.disabled,true);second();assert.equal(nodes[0].hidden,true);assert.equal(button.disabled,false);
+button.disabled=true;window.requestLoading.begin(form)();assert.equal(button.disabled,true);button.disabled=false;
+const xhr={};listeners['htmx:beforeRequest']({detail:{xhr,elt:form}});flush();assert.equal(nodes[0].hidden,false);listeners['htmx:sendError']({detail:{xhr}});listeners['htmx:afterRequest']({detail:{xhr}});assert.equal(nodes[0].hidden,true);assert.equal(button.disabled,false);
+(async()=>{
+ const apiSource=fs.readFileSync('public/app.js','utf8').split('async function api(')[1].split('function badge(')[0];
+ const context={window,document:{activeElement:{closest:()=>form}},me:{csrf:'token'},fetch:async()=>({ok:false,status:400,json:async()=>({error:'Invalid input'})})};
+ vm.createContext(context);vm.runInContext('async function api('+apiSource,context);
+ await assert.rejects(vm.runInContext("api('/api/assignments',{method:'POST'})",context),/Invalid input/);assert.equal(button.disabled,false);assert.equal(nodes[0].hidden,true);
+ context.fetch=async()=>({ok:true,json:async()=>({saved:true})});assert.equal((await vm.runInContext("api('/api/assignments',{method:'POST'})",context)).saved,true);assert.equal(button.disabled,false);
+ await assert.rejects(window.requestLoading.run(async()=>{throw new Error('network failed')},form),/network failed/);assert.equal(button.disabled,false);assert.equal(nodes[0].hidden,true);console.log('PASS: delayed loader, overlapping requests, disabled-state restoration, HTMX failure and rejected API cleanup')})().catch(error=>{console.error(error);process.exitCode=1});

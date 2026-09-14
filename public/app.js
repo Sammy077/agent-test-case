@@ -11,12 +11,14 @@ const label=value=>String(value??'').replaceAll('_',' ');
 const logo='<img class="brand-logo" src="/wing-logo.svg" width="1000" height="335" alt="Wing Bank">';
 
 async function api(url,options={}){
+  return window.requestLoading.run(async()=>{
   const headers={'Content-Type':'application/json',...options.headers};
   if(me)headers['X-CSRF-Token']=me.csrf;
   const response=await fetch(url,{...options,headers});
   const data=await response.json().catch(()=>({}));
   if(!response.ok){const error=new Error(data.error||'Request failed');error.status=response.status;error.details=data.errors||[];throw error}
   return data;
+  },options.method&&options.method.toUpperCase()!=='GET'?document.activeElement?.closest('button,form'):null);
 }
 function badge(value){const status=/^[A-Z_]+$/.test(value)?value:'NOT_STARTED';return '<span class="status '+status+'">'+escapeHtml(label(value))+'</span>'}
 function productionBadge(value){const status=/^[A-Z_]+$/.test(value)?value:'PENDING';return '<span class="status production-status '+status+'">'+escapeHtml({PASSED:'Passed',FAILED:'Failed',PENDING:'Pending',DEPENDENCY:'Dependency',NOT_EXECUTED:'Not Executed',NCFL:'NCFL',PRODUCTION_TEST:'Production Test',PRODUCTION_BUG:'Production Bug',NOT_APPLICABLE:'N/A',IN_PROGRESS:'In Progress',STAGE_TEST:'Stage Test'}[status]||label(status))+'</span>'}
