@@ -11,6 +11,7 @@ const {parseProductionWorkbook}=require('./lib/production-workbook');
 const {backupDatabase,replaceProductionData}=require('./lib/production-replacement');
 const views=require('./lib/htmx-views');
 const {caseOrder,sortSelection,observerCaseFilter}=require('./lib/case-query');
+const {migrateMultipleCaseUsers,addCaseUser,hydrateCaseUsers,caseJoins}=require('./lib/case-assignments');
 
 const DEMO_MODE=process.env.DEMO_MODE==='true';
 const SERVERLESS=process.env.SERVERLESS==='true';
@@ -106,7 +107,7 @@ function migrateAssignmentsForUnassignedCases(){
       source_details_json TEXT NOT NULL DEFAULT '{}',
       reported_result TEXT NOT NULL DEFAULT '',
       submission_note TEXT NOT NULL DEFAULT '',
-      UNIQUE(test_case_id),
+      UNIQUE(test_case_id,participant_id),
       FOREIGN KEY(test_case_id) REFERENCES test_cases(id),
       FOREIGN KEY(participant_id) REFERENCES participants(id)
     )`);
@@ -127,6 +128,7 @@ function migrateAssignmentsForUnassignedCases(){
   }catch(error){try{db.exec('ROLLBACK')}catch{}throw error}finally{db.exec('PRAGMA foreign_keys=ON')}
 }
 migrateAssignmentsForUnassignedCases();
+migrateMultipleCaseUsers(db);
 db.exec('CREATE INDEX IF NOT EXISTS idx_test_cases_channel ON test_cases(channel COLLATE NOCASE)');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_test_cases_durable_key ON test_cases(durable_key) WHERE durable_key<>\'\'');
 db.exec('CREATE INDEX IF NOT EXISTS idx_assignments_status ON assignments(status)');
@@ -149,9 +151,6 @@ try{
   db.prepare("UPDATE users SET participant_id=NULL WHERE role='OBSERVER'").run();
   db.exec('DROP INDEX IF EXISTS idx_users_observer_login; COMMIT');
 }catch(error){db.exec('ROLLBACK');throw error}
-const duplicateAssignments=db.prepare('SELECT test_case_id FROM assignments GROUP BY test_case_id HAVING COUNT(*)>1 LIMIT 1').get();
-if(duplicateAssignments)throw new Error('Cannot enforce one agent per test case: duplicate assignments exist for test_case_id '+duplicateAssignments.test_case_id);
-db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_assignments_one_agent_per_case ON assignments(test_case_id)');
 
 const hash=p=>crypto.pbkdf2Sync(p,'ptc-v1',120000,32,'sha256').toString('hex');
 if(!db.prepare("SELECT id FROM users WHERE role='ADMIN'").get())db.prepare('INSERT OR IGNORE INTO users(username,password_hash,role,display_name) VALUES(?,?,?,?)').run('admin',hash('Admin@123'),'ADMIN','System Admin');
@@ -345,7 +344,7 @@ async function importXlsx(buffer,actor){
   const findCase=db.prepare('SELECT id FROM test_cases WHERE case_code=?');
   const insertCase=db.prepare('INSERT INTO test_cases(case_code,title,process,priority,steps,expected_result,status,qa_status,channel,case_type,source_sheet) VALUES(?,?,?,?,?,?,?,?,?,?,?)');
   const updateCase=db.prepare('UPDATE test_cases SET title=?,process=?,priority=?,expected_result=?,status=?,qa_status=?,channel=?,case_type=?,source_sheet=? WHERE id=?');
-  const findAssignment=db.prepare('SELECT id FROM assignments WHERE test_case_id=?');
+  const findAssignment=db.prepare('SELECT id FROM assignments WHERE test_case_id=? AND participant_id=?');
   const insertAssignment=db.prepare('INSERT INTO assignments(test_case_id,participant_id,sequence_no,status,actual_result,tester,executed_at,qa_remark,jira_link,finance_status,finance_remark,source_details_json,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)');
   const updateAssignment=db.prepare('UPDATE assignments SET participant_id=?,sequence_no=?,status=?,actual_result=?,tester=?,executed_at=?,qa_remark=?,jira_link=?,finance_status=?,finance_remark=?,source_details_json=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?');
   let insertedCases=0,updatedCases=0,assignmentsCreated=0,assignmentsUpdated=0;
@@ -360,7 +359,7 @@ async function importXlsx(buffer,actor){
       else if(!touchedCases.has(record.caseCode)){updateCase.run(record.title,record.process,record.priority,record.expected,record.status,qaStatus(record.status),canonical,record.caseType,record.sheet,testCase.id);updatedCases++}
       touchedCases.add(record.caseCode);
       db.prepare('UPDATE test_cases SET category=?,type=?,main_feature=?,sub_feature=? WHERE id=?').run(record.category,record.type,record.mainFeature,record.subFeature,testCase.id);
-      const assignment=findAssignment.get(testCase.id);
+      const assignment=findAssignment.get(testCase.id,record.participantId);
       const args=[record.row,record.status,record.actualResult,record.tester,record.executedAt,record.qaRemark,record.jiraLink,record.financeStatus,record.financeRemark,JSON.stringify(record.details),actor];
       let assignmentId;
       if(assignment){updateAssignment.run(record.participantId,...args,assignment.id);assignmentId=assignment.id;assignmentsUpdated++}
@@ -473,25 +472,31 @@ async function api(req,res,url){
     const u=requireWrite(req,res,['ADMIN']);if(!u)return;const d=await bodyJson(req),participantId=Number(d.participantId),caseIds=[...new Set(Array.isArray(d.caseIds)?d.caseIds.map(Number):[])];
     if(!caseIds.length||caseIds.length>10000||caseIds.some(id=>!Number.isSafeInteger(id)||id<1))return json(res,400,{error:'Select between 1 and 10,000 valid test cases'});
     const participant=db.prepare('SELECT id,code,name FROM participants WHERE id=? AND active=1').get(participantId);if(!participant)return json(res,400,{error:'An active participant is required'});
-    const placeholders=caseIds.map(()=>'?').join(','),assignments=db.prepare(`SELECT a.id,a.test_case_id,a.status,a.participant_id,tc.case_code FROM assignments a JOIN test_cases tc ON tc.id=a.test_case_id WHERE a.test_case_id IN (${placeholders})`).all(...caseIds);
-    if(assignments.length!==caseIds.length)return json(res,404,{error:'One or more test-case assignments were not found'});
-    const locked=assignments.filter(item=>item.status!=='NOT_STARTED');if(locked.length)return json(res,409,{error:'Only Not Started test cases can be reassigned',caseIds:locked.map(item=>item.test_case_id)});
-    try{db.exec('BEGIN IMMEDIATE');const update=db.prepare('UPDATE assignments SET participant_id=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?');for(const item of assignments){update.run(participantId,u.username,item.id);audit(u.username,'BULK_REASSIGN','ASSIGNMENT',item.id,item.participant_id+' -> '+participantId)}db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
-    broadcast('refresh',{scope:'all'});return json(res,200,{ok:true,updated:assignments.length,participant:{id:participant.id,code:participant.code,name:participant.name}});
+    let added=0;
+    try{db.exec('BEGIN IMMEDIATE');for(const caseId of caseIds){if(!db.prepare('SELECT id FROM test_cases WHERE id=?').get(caseId))throw Object.assign(Error('One or more test cases were not found'),{status:404});const result=addCaseUser(db,caseId,participantId,u.username);if(result.added){added++;audit(u.username,'ADD_CASE_USER','ASSIGNMENT',result.id,String(participantId))}}db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
+    broadcast('refresh',{scope:'all'});return json(res,200,{ok:true,updated:added,participant});
   }
   if(url.pathname==='/api/test-cases'&&req.method==='GET'){
     const u=requireRole(req,res,['ADMIN']);if(!u)return;const filter=assignmentCaseFilter(url),limit=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||50)),offset=Math.max(0,Number(url.searchParams.get('offset'))||0),status=cleanText(url.searchParams.get('status')).toUpperCase();
-    if(status){if(!['NOT_STARTED','IN_PROGRESS','PENDING_QA','COMPLETED','FAILED','BLOCKED','RETESTING','RESOLVED'].includes(status))return json(res,400,{error:'Unknown assignment status'});filter.sql+=' AND a.status=?';filter.args.push(status)}
-    const items=db.prepare(`SELECT tc.id,tc.case_code,tc.source_case_id,tc.subcategory,tc.channel,tc.title,tc.process,tc.priority,tc.case_type,tc.source_sheet,tc.category,tc.type,tc.main_feature,tc.sub_feature,COUNT(a.id) assignments,a.id assignment_id,a.participant_id,p.code participant_code,p.name participant_name,a.status assignment_status,a.production_status FROM test_cases tc LEFT JOIN assignments a ON a.test_case_id=tc.id LEFT JOIN participants p ON p.id=a.participant_id WHERE 1=1${filter.sql} GROUP BY tc.id ORDER BY ${caseOrder(url,'tc.channel COLLATE NOCASE,tc.priority,tc.case_code')} LIMIT ? OFFSET ?`).all(...filter.args,limit,offset);
-    const total=db.prepare(`SELECT COUNT(*) count FROM test_cases tc LEFT JOIN assignments a ON a.test_case_id=tc.id WHERE 1=1${filter.sql}`).get(...filter.args).count;return json(res,200,{items,total,limit,offset,availableSheets:assignmentSheets(url)});
+    if(status){if(!['NOT_STARTED','IN_PROGRESS','PENDING_QA','COMPLETED','FAILED','BLOCKED','RETESTING','RESOLVED'].includes(status))return json(res,400,{error:'Unknown assignment status'});filter.sql+=' AND EXISTS(SELECT 1 FROM assignments af WHERE af.test_case_id=tc.id AND af.status=?)';filter.args.push(status)}
+    const items=db.prepare(`SELECT tc.id,tc.case_code,tc.source_case_id,tc.subcategory,tc.channel,tc.title,tc.process,tc.priority,tc.case_type,tc.source_sheet,tc.category,tc.type,tc.main_feature,tc.sub_feature,(SELECT COUNT(*) FROM assignments ac WHERE ac.test_case_id=tc.id AND ac.participant_id IS NOT NULL) assignments,a.id assignment_id,a.participant_id,p.code participant_code,p.name participant_name,a.status assignment_status,a.production_status FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql} GROUP BY tc.id ORDER BY ${caseOrder(url,'tc.channel COLLATE NOCASE,tc.priority,tc.case_code')} LIMIT ? OFFSET ?`).all(...filter.args,limit,offset);
+    const total=db.prepare(`SELECT COUNT(*) count FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql}`).get(...filter.args).count;return json(res,200,{items:hydrateCaseUsers(db,items),total,limit,offset,availableSheets:assignmentSheets(url)});
   }
   if(url.pathname.match(/^\/api\/test-cases\/\d+\/assignment$/)&&req.method==='PUT'){
     const u=requireWrite(req,res,['ADMIN']);if(!u)return;const testCaseId=Number(url.pathname.split('/')[3]),d=await bodyJson(req),participantId=Number(d.participantId);
-    const participant=db.prepare('SELECT id FROM participants WHERE id=? AND active=1').get(participantId),assignment=db.prepare('SELECT id,status,participant_id FROM assignments WHERE test_case_id=?').get(testCaseId);
-    if(!participant)return json(res,400,{error:'An active participant is required'});
-    if(!assignment)return json(res,404,{error:'Assignment not found'});
-    if(assignment.status!=='NOT_STARTED')return json(res,409,{error:'Only Not Started test cases can be reassigned'});
-    db.prepare('UPDATE assignments SET participant_id=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(participantId,u.username,assignment.id);audit(u.username,'REASSIGN','ASSIGNMENT',assignment.id,assignment.participant_id+' -> '+participantId);broadcast('refresh',{scope:'all'});return json(res,200,{ok:true});
+    if(!db.prepare('SELECT id FROM participants WHERE id=? AND active=1').get(participantId))return json(res,400,{error:'An active participant is required'});
+    let result;
+    try{db.exec('BEGIN IMMEDIATE');if(!db.prepare('SELECT id FROM test_cases WHERE id=?').get(testCaseId))throw Object.assign(Error('Case not found'),{status:404});result=addCaseUser(db,testCaseId,participantId,u.username);if(result.added)audit(u.username,'ADD_CASE_USER','ASSIGNMENT',result.id,String(participantId));db.exec('COMMIT')}catch(error){db.exec('ROLLBACK');throw error}
+    broadcast('refresh',{scope:'all'});return json(res,200,{ok:true,...result});
+  }
+  if(/^\/api\/assignments\/\d+$/.test(url.pathname)&&req.method==='DELETE'){
+    const u=requireWrite(req,res,['ADMIN']);if(!u)return;const id=Number(url.pathname.split('/')[3]);
+    try{db.exec('BEGIN IMMEDIATE');const a=db.prepare('SELECT * FROM assignments WHERE id=?').get(id);if(!a||a.participant_id==null)throw Object.assign(Error('Assignment not found'),{status:404});if(a.status!=='NOT_STARTED'||db.prepare('SELECT id FROM defects WHERE assignment_id=?').get(id))throw Object.assign(Error('Only unstarted assignments can be removed'),{status:409});
+      const count=db.prepare('SELECT COUNT(*) n FROM assignments WHERE test_case_id=?').get(a.test_case_id).n;
+      if(count===1)db.prepare("UPDATE assignments SET participant_id=NULL,workflow_state='UNASSIGNED',updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(u.username,id);else db.prepare('DELETE FROM assignments WHERE id=?').run(id);
+      audit(u.username,'REMOVE_CASE_USER','ASSIGNMENT',id,String(a.participant_id));db.exec('COMMIT');
+    }catch(error){db.exec('ROLLBACK');throw error}
+    broadcast('refresh',{scope:'all'});return json(res,200,{ok:true});
   }
   if(url.pathname==='/api/defects'){
     const u=requireRole(req,res,['QA_LEAD','TECH','ADMIN','MANAGER','DISPLAY','OBSERVER']);if(!u)return;const filter=scopedFilter(u,url);
@@ -548,10 +553,10 @@ function assignmentsData(user,url){if(user.role==='OBSERVER')return observerAssi
 function defectData(url,user){const filter=scopedFilter(user,url);return {items:db.prepare(`SELECT d.*,tc.case_code,tc.source_case_id,tc.title,tc.subcategory,tc.source_sheet,tc.channel,p.code participant_code,p.name participant_name,a.tester,a.qa_remark,a.jira_link,a.finance_status FROM defects d JOIN assignments a ON a.id=d.assignment_id JOIN test_cases tc ON tc.id=a.test_case_id JOIN participants p ON p.id=a.participant_id WHERE 1=1${filter.sql} ORDER BY tc.channel COLLATE NOCASE,d.updated_at DESC`).all(...filter.args),availableChannels:user?.role==='OBSERVER'?scopedChannels(user):db.prepare('SELECT DISTINCT channel FROM test_cases ORDER BY channel COLLATE NOCASE').all().map(x=>x.channel)} }
 function submissionsData(url,user){const filter=scopedFilter(user,url);return {items:db.prepare(`SELECT a.id,a.reported_result,a.submission_note,tc.case_code,tc.source_case_id,tc.title,tc.subcategory,tc.source_sheet,tc.channel,p.code participant_code,p.name participant_name FROM assignments a JOIN test_cases tc ON tc.id=a.test_case_id JOIN participants p ON p.id=a.participant_id WHERE a.status='PENDING_QA'${filter.sql} ORDER BY tc.channel COLLATE NOCASE,tc.priority,a.updated_at`).all(...filter.args),availableChannels:user?.role==='OBSERVER'?scopedChannels(user):db.prepare('SELECT DISTINCT channel FROM test_cases ORDER BY channel COLLATE NOCASE').all().map(x=>x.channel)} }
 function adminData(url){
-  const participants=db.prepare('SELECT * FROM participants ORDER BY type,code').all(),users=db.prepare("SELECT u.id,u.username,u.role,u.display_name,u.active FROM users u WHERE u.role IN ('MANAGER','DISPLAY') ORDER BY u.role,u.username").all(),filter=assignmentCaseFilter(url),status=cleanText(url.searchParams.get('status')).toUpperCase(),page=Math.max(1,Number(url.searchParams.get('page'))||1),limit=50,offset=(page-1)*limit;if(status==='NOT_STARTED'){filter.sql+=' AND a.status=?';filter.args.push(status)}
-  const cases=db.prepare(`SELECT tc.id,tc.case_code,tc.source_case_id,tc.channel,tc.source_sheet,tc.subcategory,tc.category,tc.type,tc.main_feature,tc.sub_feature,tc.title,tc.priority,a.participant_id,p.code participant_code,p.name participant_name,a.status assignment_status,a.production_status FROM test_cases tc LEFT JOIN assignments a ON a.test_case_id=tc.id LEFT JOIN participants p ON p.id=a.participant_id WHERE 1=1${filter.sql} ORDER BY ${caseOrder(url,'tc.channel COLLATE NOCASE,tc.priority,tc.case_code')} LIMIT ? OFFSET ?`).all(...filter.args,limit,offset);
-  const total=db.prepare(`SELECT COUNT(*) count FROM test_cases tc LEFT JOIN assignments a ON a.test_case_id=tc.id WHERE 1=1${filter.sql}`).get(...filter.args).count;
-  return {participants,users,cases:{items:cases,offset,limit,total,page},dashboard:summary(),selectedChannel:cleanText(url.searchParams.get('channel')),assignable:status==='NOT_STARTED',availableSheets:assignmentSheets(url),selectedSheet:url.searchParams.get('sheet')||'',selectedPriority:cleanText(url.searchParams.get('priority')),...sortSelection(url),filters:Object.fromEntries(url.searchParams)};
+  const participants=db.prepare('SELECT * FROM participants ORDER BY type,code').all(),users=db.prepare("SELECT u.id,u.username,u.role,u.display_name,u.active FROM users u WHERE u.role IN ('MANAGER','DISPLAY') ORDER BY u.role,u.username").all(),filter=assignmentCaseFilter(url),status=cleanText(url.searchParams.get('status')).toUpperCase(),page=Math.max(1,Number(url.searchParams.get('page'))||1),limit=50,offset=(page-1)*limit;if(status==='NOT_STARTED'){filter.sql+=' AND EXISTS(SELECT 1 FROM assignments af WHERE af.test_case_id=tc.id AND af.status=?)';filter.args.push(status)}
+  const cases=db.prepare(`SELECT tc.id,tc.case_code,tc.source_case_id,tc.channel,tc.source_sheet,tc.subcategory,tc.category,tc.type,tc.main_feature,tc.sub_feature,tc.title,tc.priority,a.participant_id,p.code participant_code,p.name participant_name,a.status assignment_status,a.production_status FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql} ORDER BY ${caseOrder(url,'tc.channel COLLATE NOCASE,tc.priority,tc.case_code')} LIMIT ? OFFSET ?`).all(...filter.args,limit,offset);
+  const total=db.prepare(`SELECT COUNT(*) count FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql}`).get(...filter.args).count;
+  return {participants,users,cases:{items:hydrateCaseUsers(db,cases),offset,limit,total,page},dashboard:summary(),selectedChannel:cleanText(url.searchParams.get('channel')),assignable:status==='NOT_STARTED',availableSheets:assignmentSheets(url),selectedSheet:url.searchParams.get('sheet')||'',selectedPriority:cleanText(url.searchParams.get('priority')),...sortSelection(url),filters:Object.fromEntries(url.searchParams)};
 }
 function renderHtmxPage(req,res,url){
   const fragment=req.headers['hx-request']==='true'&&req.headers['hx-target']==='content',path=url.pathname,user=auth(req);
@@ -585,7 +590,7 @@ async function proxyApi(req,apiPath,method,payload,contentType='application/json
   await api(inner,response,new URL(apiPath,BASE_URL));
   return {ok:status>=200&&status<300,status,headers,json:async()=>JSON.parse(output||'{}')};
 }
-function actionDestination(path){if(path.startsWith('/actions/observer/'))return '/observer';if(path.includes('/review')||path.startsWith('/actions/defects/'))return '/qa';if(path.startsWith('/actions/assignments/')&&!path.endsWith('/bulk'))return '/my-tests';return '/admin'}
+function actionDestination(path){if(path.endsWith('/remove'))return '/admin';if(path.startsWith('/actions/observer/'))return '/observer';if(path.includes('/review')||path.startsWith('/actions/defects/'))return '/qa';if(path.startsWith('/actions/assignments/')&&!path.endsWith('/bulk'))return '/my-tests';return '/admin'}
 function actionReturn(form,path){
  const destination=actionDestination(path);
  if(typeof form._returnTo!=='string')return destination;
@@ -612,15 +617,10 @@ async function actions(req,res,url){
   else if(url.pathname.match(/^\/actions\/test-cases\/\d+\/assignment$/)){apiPath='/api/test-cases/'+url.pathname.split('/')[3]+'/assignment';method='PUT'}
   else if(url.pathname.match(/^\/actions\/assignments\/\d+\/start$/)){apiPath='/api/assignments/'+url.pathname.split('/')[3]+'/status';method='PUT';payload={...form,status:'IN_PROGRESS'}}
   else if(url.pathname.match(/^\/actions\/assignments\/\d+\/submit$/)){apiPath='/api/assignments/'+url.pathname.split('/')[3]+'/status';method='PUT';payload={...form,status:'PENDING_QA'}}
+  else if(url.pathname.match(/^\/actions\/assignments\/\d+\/remove$/)){apiPath='/api/assignments/'+url.pathname.split('/')[3];method='DELETE'}
   else if(url.pathname.match(/^\/actions\/assignments\/\d+\/review$/)){apiPath='/api/assignments/'+url.pathname.split('/')[3]+'/qa-review';method='PUT'}
   else if(url.pathname.match(/^\/actions\/defects\/\d+$/)){apiPath='/api/defects/'+url.pathname.split('/')[3]+'/status';method='PUT'}
   else return html(res,404,'<section class="notice error">Action not found</section>');
-  if(!hx&&form.confirmed!=='1'&&(apiPath==='/api/test-cases/assignments'||/^\/api\/test-cases\/\d+\/assignment$/.test(apiPath))){
-    const user=requireRole(req,res,['ADMIN']);if(!user)return;if(form._csrf!==user.csrf)return html(res,403,'Invalid security token');
-    const ids=apiPath.endsWith('/assignments')?payload.caseIds:[Number(apiPath.split('/')[3])];
-    const current=ids.map(id=>db.prepare('SELECT tc.case_code,tc.source_case_id,tc.subcategory,tc.source_sheet,p.code,p.name FROM assignments a JOIN test_cases tc ON tc.id=a.test_case_id JOIN participants p ON p.id=a.participant_id WHERE tc.id=?').get(id)).filter(Boolean);
-    if(current.length){const hidden=Object.entries(form).flatMap(([key,value])=>[].concat(value).map(v=>'<input type="hidden" name="'+views.esc(key)+'" value="'+views.esc(v)+'">')).join(''),content='<section class="card"><h2>Confirm reassignment</h2><div class="form"><p>Already assigned:</p>'+current.map(x=>'<p>'+views.esc(require('./public/case-ui').caseLabel(x)+' → '+x.code+' · '+x.name)+'</p>').join('')+'<p>Replace existing tester assignments?</p><form method="post" action="'+views.esc(url.pathname)+'">'+hidden+'<input type="hidden" name="confirmed" value="1"><button>Confirm assignment</button><a class="btn alt" href="'+views.esc(actionReturn(form,url.pathname))+'">Cancel</a></form></div></section>';return html(res,200,views.document({title:'Confirm reassignment',user,path:'/admin',content}))}
-  }
   const response=await proxyApi(req,apiPath,method,payload,contentType,form._csrf),data=await response.json().catch(()=>({}));
   if(!response.ok){const content='<section class="notice error"><b>'+views.esc(data.error||'Request failed')+'</b>'+((data.errors||[]).map(x=>'<p>'+views.esc((x.sheet?x.sheet+' ':'')+(x.row?'row '+x.row+' ':'')+(x.field||'')+': '+x.message)+'</p>').join(''))+'</section>';return html(res,response.status,hx?content:views.document({title:'Request error',user:auth(req),path:actionDestination(url.pathname),content}))}
   const target=url.pathname==='/actions/import-production'?'/admin?channel='+encodeURIComponent(data.channel):actionReturn(form,url.pathname);if(hx)return html(res,204,'',{'HX-Redirect':target});return redirect(res,target);

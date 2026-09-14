@@ -16,9 +16,4 @@ document.addEventListener('htmx:afterSwap',event=>{syncPageMode(event.detail.xhr
 // Capture before HTMX handles the form change so disabled Order By is enabled in time.
 document.addEventListener('change',event=>{if(event.target.name!=='sortBy')return;const order=event.target.closest('form')?.querySelector('[name="orderBy"]');if(order)order.disabled=event.target.value==='default'},true);
 
-function assignmentWarning(form){
- const current=form.id==='bulk-form'?[...document.querySelectorAll('.case-select:checked')].map(x=>x.dataset.currentTester).filter(Boolean):[form.dataset.assignmentConfirm].filter(Boolean);
- return current.length?'Already assigned:\n'+current.join('\n')+'\nReplace existing tester assignment(s)?':'';
-}
-document.addEventListener('htmx:confirm',event=>{const form=event.detail.elt.closest('form');if(!form||!(form.id==='bulk-form'||form.hasAttribute('data-assignment-confirm')))return;const message=assignmentWarning(form);if(!message)return;event.preventDefault();if(window.confirm(message))event.detail.issueRequest(true)});
-document.addEventListener('submit',event=>{if(window.htmx)return;const form=event.target;if(!(form.id==='bulk-form'||form.hasAttribute('data-assignment-confirm')))return;const message=assignmentWarning(form);if(message&&!window.confirm(message))event.preventDefault()});
+// Assignment controls add users; existing assignments stay intact.

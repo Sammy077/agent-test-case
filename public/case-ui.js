@@ -8,6 +8,9 @@
  function observerControls(data,legacy=false){const f=data.filters||{};return select('Priority','priority',[['','All priorities'],...[1,2,3,4].map(x=>[x,'Priority '+x])],f.priority||'',legacy)+select('Main Feature','mainFeature',[['','All main features'],...(data.availableMainFeatures||[]).map(x=>[x,x])],f.mainFeature||'',legacy)+select('Sub Feature','subFeature',[['','All sub features'],...(data.availableSubFeatures||[]).map(x=>[x,x])],f.subFeature||'',legacy)+sortControls(f,legacy)}
  function caseLabel(item){const id=item.source_case_id||item.case_code,classification=item.subcategory||item.source_sheet;return id+(classification?' · '+classification:'')}
  function uniqueReference(item){const parts=[item.channel,item.subcategory||item.source_sheet,item.source_case_id||item.case_code].filter(value=>value!=null&&value!=='');return parts.join(' / ')+' · #'+(item.test_case_id||item.id)}
+ function assignedUsersHtml(item,legacy=false,security=''){
+  return '<div class="assigned-user-list">'+(item.assigned_users||[]).map(user=>'<div><b>'+esc(user.code+' · '+user.name)+'</b><small>'+esc(user.status.replaceAll('_',' '))+'</small>'+(user.status==='NOT_STARTED'?(legacy?'<button type="button" class="alt" data-action="remove-case-user" data-id="'+esc(user.id)+'">Remove</button>':'<form method="post" action="/actions/assignments/'+esc(user.id)+'/remove" hx-post="/actions/assignments/'+esc(user.id)+'/remove" hx-target="#content" hx-target-4*="#action-message" hx-target-5*="#action-message">'+security+'<button class="alt">Remove</button></form>'):'')+'</div>').join('')+'</div>';
+ }
  function detailsHtml(item){
   const source=item.source_details||{},details={};
   for(const [key,title]of [['master','Master'],['commission','Commission'],['fee','Fee']])if(Object.hasOwn(source,key))details[title]=source[key];
@@ -21,5 +24,5 @@
  }
  function clearHref(filters={}){const params=new URLSearchParams();for(const key of ['participantId','participant','sortBy','orderBy'])if(filters[key])params.set(key,filters[key]);return '/my-tests'+(params.size?'?'+params:'')}
  function returnInput(path,filters={}){const params=new URLSearchParams(filters);return '<input type="hidden" name="_returnTo" value="'+esc(path+(params.size?'?'+params:''))+'">'}
- return {sortControls,observerControls,caseLabel,uniqueReference,detailsHtml,clearHref,returnInput};
+ return {sortControls,observerControls,caseLabel,uniqueReference,assignedUsersHtml,detailsHtml,clearHref,returnInput};
 });
