@@ -1,71 +1,56 @@
 {
-  "source": "Loop test case.xlsx",
+  "source": "Round Plan Testing(1).numbers",
   "features": [
     {
       "id": "F01",
-      "name": "Cash In (Wing Accounts) with Manual Input",
-      "material": "Wing Account KHR / USD",
-      "customerLive": "Yes"
+      "name": "Manual 1: Cash out From Wing Account by manual input account",
+      "scenario": "1. CO from customer FC to WCX by manual input account number",
+      "instructions": "1. Click on cash Out From wing account\n2. Tap Close loop Card",
+      "raw": "Manual 1: Cash out From Wing Account by manual input account\n\nTest Scenario\n1. CO from customer FC to WCX by manual input account number\n\nInstruction\n1. Click on cash Out From wing account\n2. Tap Close loop Card",
+      "customer": "Customer 1"
     },
     {
       "id": "F02",
-      "name": "Cash In (Wing Accounts) with Swipe Closed-Loop Card",
-      "material": "Closed-Loop Card KHR",
-      "customerLive": "No"
+      "name": "Manual 2: Cash out From Wing Account by manual input account",
+      "scenario": "1. CO from customer FC to WCX by manual input account number",
+      "instructions": "1. Click on cash Out From wing account\n2. Tap Close loop Card",
+      "raw": "Manual 2: Cash out From Wing Account by manual input account\n\nTest Scenario\n1. CO from customer FC to WCX by manual input account number\n\nInstruction\n1. Click on cash Out From wing account\n2. Tap Close loop Card",
+      "customer": "Customer 2"
     },
     {
       "id": "F03",
-      "name": "Cash In (Wing Accounts) with Swipe Closed-Loop Card",
-      "material": "Closed-Loop Card USD",
-      "customerLive": "No"
+      "name": "CC 1: Cash out From Wing Account by Swap close loop card",
+      "scenario": "1. CO from customer FC to WCX by Swap close loop card",
+      "instructions": "1. Click on cash Out From wing account\n2. Tap Close loop Card",
+      "raw": "CC 1: Cash out From Wing Account by Swap close loop card\n\nTest Scenario\n1. CO from customer FC to WCX by Swap close loop card\n\nInstruction\n1. Click on cash Out From wing account\n2. Tap Close loop Card"
     },
     {
       "id": "F04",
-      "name": "Cash In by Scan Static QR",
-      "material": "Printed Static QR",
-      "customerLive": "No"
+      "name": "CC2: Cash out From Wing Account by Swap close loop card",
+      "scenario": "1. CO from customer FC to WCX by Swap close loop card",
+      "instructions": "1. Click on cash Out From wing account\n2. Tap Close loop Card",
+      "raw": "CC2: Cash out From Wing Account by Swap close loop card\n\nTest Scenario\n1. CO from customer FC to WCX by Swap close loop card\n\nInstruction\n1. Click on cash Out From wing account\n2. Tap Close loop Card"
     },
     {
       "id": "F05",
-      "name": "Cash In to Other Bank (Bakong Member) with Scan QR",
-      "material": "Printed Other Bank QR",
-      "customerLive": "No"
+      "name": "Cash out by scan on QR From Wingbank App (KHR)",
+      "scenario": "1. CO from customer FC to WCX by Scan Standee QR from Wing Bank",
+      "instructions": "1. Scan cash out from wing bank bank with QR standee",
+      "raw": "Cash out by scan on QR From Wingbank App (KHR)\n\nTest Scenario\n1. CO from customer FC to WCX by Scan Standee QR from Wing Bank\n\nInstruction\n1. Scan cash out from wing bank bank with QR standee"
     },
     {
       "id": "F06",
-      "name": "Cash In to Other Bank (Bakong Member) with Scan QR",
-      "material": "Printed Other Bank QR",
-      "customerLive": "No"
+      "name": "Cash out by scan on QR From Wingbank App (USD)",
+      "scenario": "1. CO from customer FC to WCX by Scan Standee QR from Wing Bank",
+      "instructions": "1. Scan cash out from wing bank bank with QR standee",
+      "raw": "Cash out by scan on QR From Wingbank App (USD)\n\nTest Scenario\n1. CO from customer FC to WCX by Scan Standee QR from Wing Bank\n\nInstruction\n1. Scan cash out from wing bank bank with QR standee"
     },
     {
       "id": "F07",
-      "name": "Cash In to Other Bank (Bakong Member) with Scan QR",
-      "material": "Printed Other Bank QR",
-      "customerLive": "No"
-    },
-    {
-      "id": "F08",
-      "name": "Cash In to Other Bank (Bakong Member) with Scan QR Dynamic – Set Amount",
-      "material": "Prepared Dynamic QR",
-      "customerLive": "No"
-    },
-    {
-      "id": "F09",
-      "name": "Cash In to Other Bank (Bakong Member) with Scan QR Dynamic – Set Amount",
-      "material": "Prepared Dynamic QR",
-      "customerLive": "No"
-    },
-    {
-      "id": "F10",
-      "name": "Cash In to Other Bank (Bakong Member) with Scan QR Dynamic – Set Amount",
-      "material": "Prepared Dynamic QR",
-      "customerLive": "No"
-    },
-    {
-      "id": "F11",
-      "name": "Cash In with Scan Dynamic QR",
-      "material": "Prepared Dynamic QR",
-      "customerLive": "No"
+      "name": "Cash Out From Bakong Member",
+      "scenario": "1. CO from other bank to WCX\n2. Generate from Wing POS",
+      "instructions": "1. Click on cash Out from bakong member\n2. Scan QR code and input amount",
+      "raw": "Cash Out From Bakong Member\n\nTest Scenario\n1. CO from other bank to WCX\n2. Generate from Wing POS\n\nInstruction\n1. Click on cash Out from bakong member\n2. Scan QR code and input amount"
     }
   ],
   "rounds": [
@@ -107,31 +92,31 @@
       "items": [
         {
           "tester": 1,
-          "featureId": "F02"
-        },
-        {
-          "tester": 2,
-          "featureId": "F03"
-        },
-        {
-          "tester": 3,
-          "featureId": "F04"
-        },
-        {
-          "tester": 4,
-          "featureId": "F05"
-        },
-        {
-          "tester": 5,
-          "featureId": "F06"
-        },
-        {
-          "tester": 6,
           "featureId": "F07"
         },
         {
+          "tester": 2,
+          "featureId": "F01"
+        },
+        {
+          "tester": 3,
+          "featureId": "F02"
+        },
+        {
+          "tester": 4,
+          "featureId": "F03"
+        },
+        {
+          "tester": 5,
+          "featureId": "F04"
+        },
+        {
+          "tester": 6,
+          "featureId": "F05"
+        },
+        {
           "tester": 7,
-          "featureId": "F08"
+          "featureId": "F06"
         }
       ]
     },
@@ -140,31 +125,31 @@
       "items": [
         {
           "tester": 1,
-          "featureId": "F03"
-        },
-        {
-          "tester": 2,
-          "featureId": "F04"
-        },
-        {
-          "tester": 3,
-          "featureId": "F05"
-        },
-        {
-          "tester": 4,
           "featureId": "F06"
         },
         {
-          "tester": 5,
+          "tester": 2,
           "featureId": "F07"
         },
         {
+          "tester": 3,
+          "featureId": "F01"
+        },
+        {
+          "tester": 4,
+          "featureId": "F02"
+        },
+        {
+          "tester": 5,
+          "featureId": "F03"
+        },
+        {
           "tester": 6,
-          "featureId": "F08"
+          "featureId": "F04"
         },
         {
           "tester": 7,
-          "featureId": "F09"
+          "featureId": "F05"
         }
       ]
     },
@@ -173,31 +158,31 @@
       "items": [
         {
           "tester": 1,
-          "featureId": "F04"
-        },
-        {
-          "tester": 2,
           "featureId": "F05"
         },
         {
-          "tester": 3,
+          "tester": 2,
           "featureId": "F06"
         },
         {
-          "tester": 4,
+          "tester": 3,
           "featureId": "F07"
         },
         {
+          "tester": 4,
+          "featureId": "F01"
+        },
+        {
           "tester": 5,
-          "featureId": "F08"
+          "featureId": "F02"
         },
         {
           "tester": 6,
-          "featureId": "F09"
+          "featureId": "F03"
         },
         {
           "tester": 7,
-          "featureId": "F10"
+          "featureId": "F04"
         }
       ]
     },
@@ -206,31 +191,31 @@
       "items": [
         {
           "tester": 1,
-          "featureId": "F05"
+          "featureId": "F04"
         },
         {
           "tester": 2,
-          "featureId": "F06"
+          "featureId": "F05"
         },
         {
           "tester": 3,
-          "featureId": "F07"
+          "featureId": "F06"
         },
         {
           "tester": 4,
-          "featureId": "F08"
+          "featureId": "F07"
         },
         {
           "tester": 5,
-          "featureId": "F09"
+          "featureId": "F01"
         },
         {
           "tester": 6,
-          "featureId": "F10"
+          "featureId": "F02"
         },
         {
           "tester": 7,
-          "featureId": "F11"
+          "featureId": "F03"
         }
       ]
     },
@@ -239,31 +224,31 @@
       "items": [
         {
           "tester": 1,
-          "featureId": "F06"
+          "featureId": "F03"
         },
         {
           "tester": 2,
-          "featureId": "F07"
+          "featureId": "F04"
         },
         {
           "tester": 3,
-          "featureId": "F08"
+          "featureId": "F05"
         },
         {
           "tester": 4,
-          "featureId": "F09"
+          "featureId": "F06"
         },
         {
           "tester": 5,
-          "featureId": "F10"
+          "featureId": "F07"
         },
         {
           "tester": 6,
-          "featureId": "F11"
+          "featureId": "F01"
         },
         {
           "tester": 7,
-          "featureId": "F01"
+          "featureId": "F02"
         }
       ]
     },
@@ -272,163 +257,31 @@
       "items": [
         {
           "tester": 1,
+          "featureId": "F02"
+        },
+        {
+          "tester": 2,
+          "featureId": "F03"
+        },
+        {
+          "tester": 3,
+          "featureId": "F04"
+        },
+        {
+          "tester": 4,
+          "featureId": "F05"
+        },
+        {
+          "tester": 5,
+          "featureId": "F06"
+        },
+        {
+          "tester": 6,
           "featureId": "F07"
         },
         {
-          "tester": 2,
-          "featureId": "F08"
-        },
-        {
-          "tester": 3,
-          "featureId": "F09"
-        },
-        {
-          "tester": 4,
-          "featureId": "F10"
-        },
-        {
-          "tester": 5,
-          "featureId": "F11"
-        },
-        {
-          "tester": 6,
-          "featureId": "F01"
-        },
-        {
           "tester": 7,
-          "featureId": "F02"
-        }
-      ]
-    },
-    {
-      "name": "R8",
-      "items": [
-        {
-          "tester": 1,
-          "featureId": "F08"
-        },
-        {
-          "tester": 2,
-          "featureId": "F09"
-        },
-        {
-          "tester": 3,
-          "featureId": "F10"
-        },
-        {
-          "tester": 4,
-          "featureId": "F11"
-        },
-        {
-          "tester": 5,
           "featureId": "F01"
-        },
-        {
-          "tester": 6,
-          "featureId": "F02"
-        },
-        {
-          "tester": 7,
-          "featureId": "F03"
-        }
-      ]
-    },
-    {
-      "name": "R9",
-      "items": [
-        {
-          "tester": 1,
-          "featureId": "F09"
-        },
-        {
-          "tester": 2,
-          "featureId": "F10"
-        },
-        {
-          "tester": 3,
-          "featureId": "F11"
-        },
-        {
-          "tester": 4,
-          "featureId": "F01"
-        },
-        {
-          "tester": 5,
-          "featureId": "F02"
-        },
-        {
-          "tester": 6,
-          "featureId": "F03"
-        },
-        {
-          "tester": 7,
-          "featureId": "F04"
-        }
-      ]
-    },
-    {
-      "name": "R10",
-      "items": [
-        {
-          "tester": 1,
-          "featureId": "F10"
-        },
-        {
-          "tester": 2,
-          "featureId": "F11"
-        },
-        {
-          "tester": 3,
-          "featureId": "F01"
-        },
-        {
-          "tester": 4,
-          "featureId": "F02"
-        },
-        {
-          "tester": 5,
-          "featureId": "F03"
-        },
-        {
-          "tester": 6,
-          "featureId": "F04"
-        },
-        {
-          "tester": 7,
-          "featureId": "F05"
-        }
-      ]
-    },
-    {
-      "name": "R11",
-      "items": [
-        {
-          "tester": 1,
-          "featureId": "F11"
-        },
-        {
-          "tester": 2,
-          "featureId": "F01"
-        },
-        {
-          "tester": 3,
-          "featureId": "F02"
-        },
-        {
-          "tester": 4,
-          "featureId": "F03"
-        },
-        {
-          "tester": 5,
-          "featureId": "F04"
-        },
-        {
-          "tester": 6,
-          "featureId": "F05"
-        },
-        {
-          "tester": 7,
-          "featureId": "F06"
         }
       ]
     }

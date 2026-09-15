@@ -567,3 +567,7 @@ body:not(.tv) .my-agent-schedule-table{min-width:640px;table-layout:fixed}
  .my-agent-heading{padding:20px 24px}
  .my-agent-history > summary{font-size:clamp(20px,.75vw,28px)}
 }
+.my-agent-case-text{white-space:pre-line}
+.my-agent-loop-feature h3{margin:14px 0 4px;font-size:1em}
+.my-agent-case-amounts{padding:8px 10px;border-radius:8px;background:#eef3f8;font-weight:600;white-space:pre-line}
+.my-agent-feature-key dd > span{white-space:pre-line}

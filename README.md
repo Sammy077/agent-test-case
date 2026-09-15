@@ -121,7 +121,7 @@ Administration → Import production sample · Excel → enter Channel name → 
 
 ### My Agent rounds
 
-Administrators can open **My Agent** to view `Loop test case.xlsx`: 11 features and 11 rounds for seven testers (A01–A07). All seven cards display assigned feature, required material, and customer-live requirement. Round 1 appears immediately. **Next Round** changes the displayed round without completion gates. Round 11 loops back to Round 1. No status, progress, completion buttons, or results tracking. **Workbook Schedule** displays the full reference matrix. Existing testing results remain saved separately.
+Administrators can open **My Agent** to view `Round Plan Testing(1).numbers`: seven scenarios and seven rounds for seven testers (A01–A07). All seven cards display assigned Cash Out scenario, instructions, scenario and instructions. Round 1 appears immediately. **Next Round** changes the displayed round without completion gates. Round 7 loops back to Round 1. No status, progress, completion buttons, or results tracking. **Workbook Schedule** displays the full reference matrix. Existing testing results remain saved separately.
 
 Run `npm run test:agent-loop` for workbook mapping, unrestricted navigation, stale requests, and final-round behavior.
 

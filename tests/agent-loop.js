@@ -2,18 +2,12 @@
 const assert=require('node:assert/strict'),{DatabaseSync}=require('node:sqlite');
 const loop=require('../lib/agent-loop'),db=new DatabaseSync(':memory:');
 db.exec('CREATE TABLE participants(id INTEGER PRIMARY KEY,code TEXT,name TEXT,type TEXT,active INTEGER DEFAULT 1)');for(let i=1;i<=7;i++)db.prepare("INSERT INTO participants(code,name,type) VALUES(?,?,'AGENT')").run('A0'+i,'Agent '+i);
-loop.setup(db);const audit=()=>{};
-assert.equal(loop.overview(db).round,1);
-assert.deepEqual(loop.overview(db).items.map(i=>i.feature.id),['F01','F02','F03','F04','F05','F06','F07']);
-assert.throws(()=>loop.next(db,{round:0},'admin',audit),/changed/);
-for(let round=1;round<=11;round++){const view=loop.overview(db);assert.equal(view.items.length,7);assert.ok(view.items.every(i=>!('result' in i)));if(round<11)loop.next(db,{round},'admin',audit)}
-assert.equal(loop.overview(db).round,11);assert.equal(db.prepare('SELECT COUNT(*) n FROM agent_loop_results').get().n,0);
-assert.equal(loop.next(db,{round:11},'admin',audit).round,1);
-assert.deepEqual(loop.overview(db).items.map(i=>i.feature.id),['F01','F02','F03','F04','F05','F06','F07']);
-assert.throws(()=>loop.next(db,{round:11},'admin',audit),/changed/);
+loop.setup(db);const audit=()=>{},initial=['F01','F02','F03','F04','F05','F06','F07'];
+assert.equal(loop.overview(db).round,1);assert.equal(loop.overview(db).source,'Round Plan Testing(1).numbers');assert.equal(loop.overview(db).totalRounds,7);
+assert.equal(loop.overview(db).items[0].feature.customer,'Customer 1');
+assert.equal(loop.overview(db).items[1].feature.customer,'Customer 2');
 assert.throws(()=>loop.back(db,{round:1},'admin',audit),/first round/);
-assert.equal(loop.overview(db).round,1);
-for(let round=1;round<11;round++)loop.next(db,{round},'admin',audit);
-assert.equal(loop.back(db,{round:11},'admin',audit).round,10);
-assert.throws(()=>loop.back(db,{round:11},'admin',audit),/changed/);
-console.log('PASS: workbook mapping, immediate Round 1, unrestricted round navigation, no completion tracking, stale requests, final round');db.close();
+for(let round=1;round<=7;round++){const view=loop.overview(db);assert.deepEqual(view.items.map(i=>i.feature?.id||null),initial.map((_,t)=>initial[(t-round+8)%7]));assert.equal(view.items.filter(i=>i.feature).length,7);assert.ok(view.items.filter(i=>i.feature).every(i=>i.feature.scenario&&i.feature.instructions));if(round<7)loop.next(db,{round},'admin',audit)}
+assert.equal(loop.next(db,{round:7},'admin',audit).round,1);assert.throws(()=>loop.next(db,{round:7},'admin',audit),/changed/);assert.equal(loop.next(db,{round:1},'admin',audit).round,2);assert.equal(loop.back(db,{round:2},'admin',audit).round,1);
+assert.equal(db.prepare('SELECT COUNT(*) n FROM agent_loop_results').get().n,0);
+console.log('PASS: Numbers schedule, rightward rotation, 49 assignments, seven populated slots, forward/back navigation, R1 guard, no tracking');db.close();
