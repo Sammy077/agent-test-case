@@ -118,3 +118,11 @@ Administrator can create empty Observer accounts or choose optional initial test
 ### Production sample upload by channel
 
 Administration → Import production sample · Excel → enter Channel name → choose `.xlsx` → Validate and import. Every imported case uses entered channel; worksheet names remain subcategories. Existing channel spelling matches without case sensitivity. Reuploads update case definitions by channel/worksheet/source Case ID, preserve existing assignments and saved execution/QA results, and leave absent cases and other channels intact. New cases start unassigned with imported production status. 
+
+### My Agent rounds
+
+Administrators can open **My Agent** to view `Loop test case.xlsx`: 11 features and 11 rounds for seven testers (A01–A07). All seven cards display assigned feature, required material, and customer-live requirement. Round 1 appears immediately. **Next Round** changes the displayed round without completion gates. Round 11 loops back to Round 1. No status, progress, completion buttons, or results tracking. **Workbook Schedule** displays the full reference matrix. Existing testing results remain saved separately.
+
+Run `npm run test:agent-loop` for workbook mapping, unrestricted navigation, stale requests, and final-round behavior.
+
+Run `npm run test:my-agent` for round creation, rotation, stale/repeated requests, access control, result preservation, workbook protection, and replacement/reset compatibility.

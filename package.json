@@ -14,7 +14,10 @@
     "test:production-status": "node tests/production-empty-status.js",
     "test:loading": "node tests/request-loading.js",
     "test:confirmation": "node tests/reassignment-confirmation.js",
-    "test:cases": "node tests/classified-cases.js && node tests/case-metadata-migration.js && node tests/case-client.js && node tests/case-id-order.js && node tests/case-filters-sorting.js && node tests/multiple-case-migration.js && node tests/multiple-case-users.js"
+    "test:cases": "node tests/classified-cases.js && node tests/case-metadata-migration.js && node tests/case-client.js && node tests/case-id-order.js && node tests/case-filters-sorting.js && node tests/multiple-case-migration.js && node tests/multiple-case-users.js",
+    "test:my-agent": "node tests/my-agent.js",
+    "test:participant-create": "node tests/participant-create-feedback.js",
+    "test:agent-loop": "node tests/agent-loop.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

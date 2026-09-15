@@ -10,8 +10,10 @@ const QRCode=require('./vendor/qrcode');
 const {parseProductionWorkbook}=require('./lib/production-workbook');
 const {backupDatabase,replaceProductionData}=require('./lib/production-replacement');
 const views=require('./lib/htmx-views');
+const myAgent=require('./lib/my-agent');
+const agentLoop=require('./lib/agent-loop');
 const {caseOrder,sortSelection,observerCaseFilter}=require('./lib/case-query');
-const {migrateMultipleCaseUsers,addCaseUser,hydrateCaseUsers,caseJoins}=require('./lib/case-assignments');
+const {migrateMultipleCaseUsers,addCaseUser:rawAddCaseUser,hydrateCaseUsers,caseJoins}=require('./lib/case-assignments');
 
 const DEMO_MODE=process.env.DEMO_MODE==='true';
 const SERVERLESS=process.env.SERVERLESS==='true';
@@ -22,6 +24,7 @@ const SECRET=process.env.APP_SECRET||'change-this-secret-before-production';
 const COOKIE_SECURE=process.env.COOKIE_SECURE==='true'||(DEMO_MODE&&process.env.VERCEL==='1');
 const ROOT=__dirname;
 const PUBLIC=path.join(ROOT,'public');
+const MY_AGENT_CLIENT_VERSION=crypto.createHash('sha256').update(fs.readFileSync(path.join(PUBLIC,'my-agent.js'))).digest('hex').slice(0,12);
 const XLSX_LIMIT=10*1024*1024;
 const XLSX_ROW_LIMIT=10000;
 const FRONTEND_MODE=process.env.FRONTEND_MODE||'htmx';
@@ -39,6 +42,14 @@ CREATE TABLE IF NOT EXISTS assignments(id INTEGER PRIMARY KEY,test_case_id INTEG
 CREATE TABLE IF NOT EXISTS defects(id INTEGER PRIMARY KEY,assignment_id INTEGER UNIQUE NOT NULL,severity TEXT NOT NULL DEFAULT 'HIGH',status TEXT NOT NULL DEFAULT 'REPORTED',owner TEXT,root_cause TEXT,resolution TEXT,build_version TEXT,updated_by TEXT,updated_at TEXT DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(assignment_id) REFERENCES assignments(id));
 CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,action TEXT NOT NULL,entity_type TEXT NOT NULL,entity_id INTEGER,details TEXT,created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 `);
+
+myAgent.setup(db);
+agentLoop.setup(db);
+function addCaseUser(db,caseId,participantId,actor){
+ const scenario=db.prepare('SELECT s.participant_id FROM agent_scenario_cases sc JOIN agent_scenarios s ON s.id=sc.scenario_id WHERE sc.case_id=?').get(caseId);
+ if(scenario&&scenario.participant_id!==participantId)throw Object.assign(Error('My Agent scenario subtasks must stay with round-assigned agent'),{status:409});
+ return rawAddCaseUser(db,caseId,participantId,actor);
+}
 
 function addColumn(table,name,definition){
   const columns=db.prepare('PRAGMA table_info('+table+')').all().map(row=>row.name);
@@ -339,6 +350,7 @@ async function importXlsx(buffer,actor){
   const workbook=new ExcelJS.Workbook();
   try{await workbook.xlsx.load(buffer,{ignoreNodes:['dataValidations','externalLinks']})}catch{throw Object.assign(Error('The Excel workbook could not be read'),{status:400})}
   const parsed=parseWorkbook(workbook);
+  if(parsed.records.some(record=>/^MA-/i.test(record.caseCode)))throw Object.assign(Error('MA- case IDs reserved for My Agent scenarios; workbook import cannot modify them'),{status:409});
   if(parsed.errors.length)throw Object.assign(Error('Workbook validation failed'),{status:400,errors:parsed.errors});
   const findChannel=db.prepare('SELECT channel FROM test_cases WHERE channel=? COLLATE NOCASE LIMIT 1');
   const findCase=db.prepare('SELECT id FROM test_cases WHERE case_code=?');
@@ -379,6 +391,22 @@ function signedQr(id){const exp=Date.now()+8*3600000,p=id+'.'+exp,s=crypto.creat
 function verifyQr(t){try{const raw=Buffer.from(t,'base64url').toString(),[id,exp,s]=raw.split('.'),expected=crypto.createHmac('sha256',SECRET).update(id+'.'+exp).digest('base64url'),ok=s&&s.length===expected.length&&crypto.timingSafeEqual(Buffer.from(s),Buffer.from(expected));return ok&&Number(exp)>Date.now()?Number(id):null}catch{return null}}
 
 async function api(req,res,url){
+  if(url.pathname==='/api/my-agent'||url.pathname.startsWith('/api/my-agent/')){
+    const user=req.method==='GET'?requireRole(req,res,['ADMIN']):requireWrite(req,res,['ADMIN']);if(!user)return;
+    if(url.pathname==='/api/my-agent/loop'&&req.method==='GET')return json(res,200,agentLoop.overview(db));
+    if(url.pathname==='/api/my-agent'&&req.method==='GET')return json(res,200,myAgent.overview(db));
+    if(req.method==='POST'){
+      const input=await bodyJson(req);
+      if(url.pathname==='/api/my-agent/loop/back'){const result=agentLoop.back(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
+      if(url.pathname==='/api/my-agent/loop/next'){const result=agentLoop.next(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
+      if(url.pathname==='/api/my-agent/scenarios'){const result=myAgent.create(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,201,result)}
+      if(url.pathname==='/api/my-agent/next'){const result=myAgent.next(db,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
+      if(url.pathname==='/api/my-agent/assign'){const result=myAgent.assign(db,input,user.username,audit,addCaseUser);broadcast('refresh',{scope:'all'});return json(res,200,result)}
+      if(url.pathname==='/api/my-agent/cancel'){db.prepare('UPDATE agent_round_state SET preview_json=NULL WHERE id=1').run();return json(res,200,{ok:true})}
+    }
+    return json(res,404,{error:'Not found'});
+  }
+
   if(url.pathname==='/api/login'&&req.method==='POST'){
     const d=await bodyJson(req),u=db.prepare('SELECT * FROM users WHERE username=? AND active=1').get(cleanText(d.username));
     if(!u||u.password_hash!==hash(d.password))return json(res,401,{error:'Invalid username or password'});
@@ -492,6 +520,7 @@ async function api(req,res,url){
   if(/^\/api\/assignments\/\d+$/.test(url.pathname)&&req.method==='DELETE'){
     const u=requireWrite(req,res,['ADMIN']);if(!u)return;const id=Number(url.pathname.split('/')[3]);
     try{db.exec('BEGIN IMMEDIATE');const a=db.prepare('SELECT * FROM assignments WHERE id=?').get(id);if(!a||a.participant_id==null)throw Object.assign(Error('Assignment not found'),{status:404});if(a.status!=='NOT_STARTED'||db.prepare('SELECT id FROM defects WHERE assignment_id=?').get(id))throw Object.assign(Error('Only unstarted assignments can be removed'),{status:409});
+      if(db.prepare('SELECT case_id FROM agent_scenario_cases WHERE case_id=?').get(a.test_case_id))throw Object.assign(Error('My Agent round subtasks cannot be individually removed'),{status:409});
       const count=db.prepare('SELECT COUNT(*) n FROM assignments WHERE test_case_id=?').get(a.test_case_id).n;
       if(count===1)db.prepare("UPDATE assignments SET participant_id=NULL,workflow_state='UNASSIGNED',updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").run(u.username,id);else db.prepare('DELETE FROM assignments WHERE id=?').run(id);
       audit(u.username,'REMOVE_CASE_USER','ASSIGNMENT',id,String(a.participant_id));db.exec('COMMIT');
@@ -543,7 +572,7 @@ async function api(req,res,url){
 
 function html(res,status,content,headers={}){res.writeHead(status,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",...headers});res.end(content)}
 function redirect(res,location){res.writeHead(303,{Location:location,'Cache-Control':'no-store'});res.end()}
-function pageRole(pathname){if(pathname==='/observer')return ['OBSERVER'];if(pathname==='/admin')return ['ADMIN'];if(pathname==='/qa')return ['QA_LEAD','TECH','ADMIN','OBSERVER'];if(pathname==='/tv/management')return ['MANAGER','DISPLAY','ADMIN','QA_LEAD','OBSERVER'];return null}
+function pageRole(pathname){if(pathname==='/observer')return ['OBSERVER'];if(pathname==='/admin'||pathname==='/my-agent')return ['ADMIN'];if(pathname==='/qa')return ['QA_LEAD','TECH','ADMIN','OBSERVER'];if(pathname==='/tv/management')return ['MANAGER','DISPLAY','ADMIN','QA_LEAD','OBSERVER'];return null}
 function assignmentsData(user,url){if(user.role==='OBSERVER')return observerAssignments(user,url,true);
   const participantScoped=['AGENT','BRANCH','OBSERVER'].includes(user.role),code=user.participantId?'':cleanText(url.searchParams.get('participant')),filter=channelWhere(url);
   if(participantScoped&&!user.participantId||!user.participantId&&!code)return {items:[],availableChannels:[]};
@@ -556,7 +585,7 @@ function adminData(url){
   const participants=db.prepare('SELECT * FROM participants ORDER BY type,code').all(),users=db.prepare("SELECT u.id,u.username,u.role,u.display_name,u.active FROM users u WHERE u.role IN ('MANAGER','DISPLAY') ORDER BY u.role,u.username").all(),filter=assignmentCaseFilter(url),status=cleanText(url.searchParams.get('status')).toUpperCase(),page=Math.max(1,Number(url.searchParams.get('page'))||1),limit=50,offset=(page-1)*limit;if(status==='NOT_STARTED'){filter.sql+=' AND EXISTS(SELECT 1 FROM assignments af WHERE af.test_case_id=tc.id AND af.status=?)';filter.args.push(status)}
   const cases=db.prepare(`SELECT tc.id,tc.case_code,tc.source_case_id,tc.channel,tc.source_sheet,tc.subcategory,tc.category,tc.type,tc.main_feature,tc.sub_feature,tc.title,tc.priority,a.participant_id,p.code participant_code,p.name participant_name,a.status assignment_status,a.production_status FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql} ORDER BY ${caseOrder(url,'tc.channel COLLATE NOCASE,tc.priority,tc.case_code')} LIMIT ? OFFSET ?`).all(...filter.args,limit,offset);
   const total=db.prepare(`SELECT COUNT(*) count FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql}`).get(...filter.args).count;
-  return {participants,users,cases:{items:hydrateCaseUsers(db,cases),offset,limit,total,page},dashboard:summary(),selectedChannel:cleanText(url.searchParams.get('channel')),assignable:status==='NOT_STARTED',availableSheets:assignmentSheets(url),selectedSheet:url.searchParams.get('sheet')||'',selectedPriority:cleanText(url.searchParams.get('priority')),...sortSelection(url),filters:Object.fromEntries(url.searchParams)};
+  return {createdParticipant:participants.find(p=>p.id===Number(url.searchParams.get('createdParticipant')))||null,participants,users,cases:{items:hydrateCaseUsers(db,cases),offset,limit,total,page},dashboard:summary(),selectedChannel:cleanText(url.searchParams.get('channel')),assignable:status==='NOT_STARTED',availableSheets:assignmentSheets(url),selectedSheet:url.searchParams.get('sheet')||'',selectedPriority:cleanText(url.searchParams.get('priority')),...sortSelection(url),filters:Object.fromEntries(url.searchParams)};
 }
 function renderHtmxPage(req,res,url){
   const fragment=req.headers['hx-request']==='true'&&req.headers['hx-target']==='content',path=url.pathname,user=auth(req);
@@ -567,6 +596,7 @@ function renderHtmxPage(req,res,url){
   if(path==='/tv/management'){title='Management · Go-live readiness';tv=true;content=views.management(summary(),participantTvSummary(user,'AGENT'),participantTvSummary(user,'BRANCH'))}
   else if(path==='/tv/agents'){if(user.role==='BRANCH')return redirect(res,'/tv/branches');const data=participantTvSummary(user,'AGENT');if(!data)return html(res,403,'<section class="notice error">Access denied</section>');title='Agent TV · Testing progress';tv=true;content=views.participantTv('AGENT',data,user.role==='AGENT')}
   else if(path==='/tv/branches'){if(user.role==='AGENT')return redirect(res,'/tv/agents');const data=participantTvSummary(user,'BRANCH');if(!data)return html(res,403,'<section class="notice error">Access denied</section>');title='Branch TV · Testing progress';tv=true;content=views.participantTv('BRANCH',data,user.role==='BRANCH')}
+  else if(path==='/my-agent'){title='My Agent';content='<div id="my-agent-app" aria-live="polite"></div><script src="/my-agent.js?v='+MY_AGENT_CLIENT_VERSION+'" defer></script>'}
   else if(path==='/my-tests'){title='My assigned test cases';content=views.myTests(assignmentsData(user,url),user,cleanText(url.searchParams.get('channel')),user.role==='OBSERVER'?url.searchParams.get('participantId')||url.searchParams.get('participant')||'':'')}
   else if(path==='/qa'){title='QA & technical workspace';content=views.qa(defectData(url,user),submissionsData(url,user),user,cleanText(url.searchParams.get('channel')))}
   else if(path==='/observer'){title='Observer tester management';content=views.observer(observerTesters(user),observerAssignments(user,url),user,url.searchParams)}
@@ -623,13 +653,13 @@ async function actions(req,res,url){
   else return html(res,404,'<section class="notice error">Action not found</section>');
   const response=await proxyApi(req,apiPath,method,payload,contentType,form._csrf),data=await response.json().catch(()=>({}));
   if(!response.ok){const content='<section class="notice error"><b>'+views.esc(data.error||'Request failed')+'</b>'+((data.errors||[]).map(x=>'<p>'+views.esc((x.sheet?x.sheet+' ':'')+(x.row?'row '+x.row+' ':'')+(x.field||'')+': '+x.message)+'</p>').join(''))+'</section>';return html(res,response.status,hx?content:views.document({title:'Request error',user:auth(req),path:actionDestination(url.pathname),content}))}
-  const target=url.pathname==='/actions/import-production'?'/admin?channel='+encodeURIComponent(data.channel):actionReturn(form,url.pathname);if(hx)return html(res,204,'',{'HX-Redirect':target});return redirect(res,target);
+  let target=url.pathname==='/actions/import-production'?'/admin?channel='+encodeURIComponent(data.channel):actionReturn(form,url.pathname);if(url.pathname==='/actions/participants'){const destination=new URL(target,BASE_URL);destination.searchParams.set('createdParticipant',String(data.id));target=destination.pathname+destination.search}if(hx)return html(res,204,'',{'HX-Redirect':target});return redirect(res,target);
 }
 
 function file(res,filePath,type='text/html',req){fs.readFile(filePath,(error,data)=>{if(error){res.writeHead(404);return res.end('Not found')}const cacheable=type!=='text/html',headers={'Content-Type':type,'Cache-Control':cacheable?'public, max-age='+(type.startsWith('image/')?'86400':'300')+', must-revalidate':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"};if(cacheable){headers.ETag='"'+crypto.createHash('sha256').update(data).digest('hex')+'"';if(String(req?.headers['if-none-match']||'').split(',').some(value=>value.trim().replace(/^W\//,'')===headers.ETag)){res.writeHead(304,headers);return res.end()}}res.writeHead(200,headers);res.end(data)})}
-const routes={'/observer':'index.html','/':'index.html','/login':'index.html','/app':'index.html','/admin':'index.html','/qa':'index.html','/my-tests':'index.html','/tv/management':'index.html','/tv/agents':'index.html','/tv/branches':'index.html','/scan':'index.html'};
-const staticAssets=Object.freeze({'/request-loading.js':['request-loading.js','text/javascript; charset=utf-8'],'/case-ui.js':['case-ui.js','text/javascript; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/htmx-client.js':['htmx-client.js','text/javascript; charset=utf-8'],'/vendor/htmx-2.0.10.min.js':['vendor/htmx-2.0.10.min.js','text/javascript; charset=utf-8'],'/vendor/htmx-ext-sse-2.2.4.js':['vendor/htmx-ext-sse-2.2.4.js','text/javascript; charset=utf-8'],'/vendor/htmx-ext-response-targets-2.0.4.js':['vendor/htmx-ext-response-targets-2.0.4.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/brand.css':['brand.css','text/css; charset=utf-8'],'/wing-logo.svg':['wing-logo.svg','image/svg+xml'],'/brand-background.png':['brand-background.png','image/png'],'/brand-background.jpg':['brand-background.jpg','image/jpeg'],'/brand-background.webp':['brand-background.webp','image/webp'],'/brand-background.svg':['brand-background.svg','image/svg+xml']});
-const requestHandler=async(req,res)=>{try{refreshSessions();const url=new URL(req.url,BASE_URL);if(url.pathname.startsWith('/api/'))return await api(req,res,url);if(url.pathname.startsWith('/actions/')&&req.method==='POST')return await actions(req,res,url);if(url.pathname==='/scan'){const id=verifyQr(url.searchParams.get('token')||''),participant=id&&db.prepare('SELECT id,code,name,type FROM participants WHERE id=? AND active=1').get(id);if(!participant){res.writeHead(403);return res.end('QR code is invalid, expired or inactive')}const sid=crypto.randomBytes(32).toString('base64url'),session={id:'participant:'+participant.id,username:'qr:'+participant.code,role:participant.type,name:participant.name,participantId:participant.id,participantCode:participant.code,csrf:crypto.randomBytes(20).toString('hex'),exp:Date.now()+28800000};const key=sessionKey(sid,session);if(!DEMO_MODE)sessions.set(key,session);res.setHeader('Set-Cookie',`ptc_session=${key}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${COOKIE_SECURE?'; Secure':''}`);if(FRONTEND_MODE==='htmx'){const target=new URL('/my-tests',BASE_URL),content=views.myTests(assignmentsData(session,target),session,'');return html(res,200,views.document({title:'My assigned test cases',user:session,path:'/my-tests',content}))}}if(FRONTEND_MODE==='htmx'&&(url.pathname==='/'||url.pathname==='/app')){const user=auth(req);return redirect(res,user?serverHome(user):'/login')}if(FRONTEND_MODE==='htmx'&&routes[url.pathname]&&url.pathname!=='/scan')return renderHtmxPage(req,res,url);if(FRONTEND_MODE!=='htmx'&&routes[url.pathname]&&!['/','/app','/login','/scan'].includes(url.pathname)){const user=auth(req);if(!user)return redirect(res,'/login?return='+encodeURIComponent(url.pathname+url.search));const roles=pageRole(url.pathname);if(roles&&!roles.includes(user.role))return html(res,403,'<section class="notice error">Access denied</section>')}if(routes[url.pathname])return file(res,path.join(PUBLIC,routes[url.pathname]));if(Object.hasOwn(staticAssets,url.pathname)){const [name,type]=staticAssets[url.pathname];return file(res,path.join(PUBLIC,name),type,req)}res.writeHead(404);res.end('Not found')}catch(error){if(!error.status)console.error(error);if(!res.headersSent){if(String(req.headers.accept||'').includes('text/html'))html(res,error.status||500,'<section class="notice error">'+views.esc(error.status?error.message:'Internal server error')+'</section>');else json(res,error.status||500,{error:error.status?error.message:'Internal server error'})}}};
+const routes={'/my-agent':'index.html','/observer':'index.html','/':'index.html','/login':'index.html','/app':'index.html','/admin':'index.html','/qa':'index.html','/my-tests':'index.html','/tv/management':'index.html','/tv/agents':'index.html','/tv/branches':'index.html','/scan':'index.html'};
+const staticAssets=Object.freeze({'/my-agent.js':['my-agent.js','text/javascript; charset=utf-8'],'/request-loading.js':['request-loading.js','text/javascript; charset=utf-8'],'/case-ui.js':['case-ui.js','text/javascript; charset=utf-8'],'/app.js':['app.js','text/javascript; charset=utf-8'],'/htmx-client.js':['htmx-client.js','text/javascript; charset=utf-8'],'/vendor/htmx-2.0.10.min.js':['vendor/htmx-2.0.10.min.js','text/javascript; charset=utf-8'],'/vendor/htmx-ext-sse-2.2.4.js':['vendor/htmx-ext-sse-2.2.4.js','text/javascript; charset=utf-8'],'/vendor/htmx-ext-response-targets-2.0.4.js':['vendor/htmx-ext-response-targets-2.0.4.js','text/javascript; charset=utf-8'],'/style.css':['style.css','text/css; charset=utf-8'],'/brand.css':['brand.css','text/css; charset=utf-8'],'/wing-logo.svg':['wing-logo.svg','image/svg+xml'],'/brand-background.png':['brand-background.png','image/png'],'/brand-background.jpg':['brand-background.jpg','image/jpeg'],'/brand-background.webp':['brand-background.webp','image/webp'],'/brand-background.svg':['brand-background.svg','image/svg+xml']});
+const requestHandler=async(req,res)=>{try{refreshSessions();const url=new URL(req.url,BASE_URL);if(url.pathname.startsWith('/api/'))return await api(req,res,url);if(url.pathname.startsWith('/actions/')&&req.method==='POST')return await actions(req,res,url);if(url.pathname==='/scan'){const id=verifyQr(url.searchParams.get('token')||''),participant=id&&db.prepare('SELECT id,code,name,type FROM participants WHERE id=? AND active=1').get(id);if(!participant){res.writeHead(403);return res.end('QR code is invalid, expired or inactive')}const sid=crypto.randomBytes(32).toString('base64url'),session={id:'participant:'+participant.id,username:'qr:'+participant.code,role:participant.type,name:participant.name,participantId:participant.id,participantCode:participant.code,csrf:crypto.randomBytes(20).toString('hex'),exp:Date.now()+28800000};const key=sessionKey(sid,session);if(!DEMO_MODE)sessions.set(key,session);res.setHeader('Set-Cookie',`ptc_session=${key}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${COOKIE_SECURE?'; Secure':''}`);if(FRONTEND_MODE==='htmx'){const target=new URL('/my-tests',BASE_URL),content=views.myTests(assignmentsData(session,target),session,'');return html(res,200,views.document({title:'My assigned test cases',user:session,path:'/my-tests',content}))}}if(FRONTEND_MODE==='htmx'&&(url.pathname==='/'||url.pathname==='/app')){const user=auth(req);return redirect(res,user?serverHome(user):'/login')}if(url.pathname==='/my-agent')return renderHtmxPage(req,res,url);if(FRONTEND_MODE==='htmx'&&routes[url.pathname]&&url.pathname!=='/scan')return renderHtmxPage(req,res,url);if(FRONTEND_MODE!=='htmx'&&routes[url.pathname]&&!['/','/app','/login','/scan'].includes(url.pathname)){const user=auth(req);if(!user)return redirect(res,'/login?return='+encodeURIComponent(url.pathname+url.search));const roles=pageRole(url.pathname);if(roles&&!roles.includes(user.role))return html(res,403,'<section class="notice error">Access denied</section>')}if(routes[url.pathname])return file(res,path.join(PUBLIC,routes[url.pathname]));if(Object.hasOwn(staticAssets,url.pathname)){const [name,type]=staticAssets[url.pathname];return file(res,path.join(PUBLIC,name),type,req)}res.writeHead(404);res.end('Not found')}catch(error){if(!error.status)console.error(error);if(!res.headersSent){if(String(req.headers.accept||'').includes('text/html'))html(res,error.status||500,'<section class="notice error">'+views.esc(error.status?error.message:'Internal server error')+'</section>');else json(res,error.status||500,{error:error.status?error.message:'Internal server error'})}}};
 const server=http.createServer(requestHandler);
 if(!SERVERLESS)server.listen(PORT,HOST,()=>console.log('Production Test Center listening on '+BASE_URL));
 module.exports={requestHandler,server,db,cleanText,statusValue,normalizeProductionStatus,PRODUCTION_STATUSES,WORKFLOW_STATES,parseWorkbook,summary,signedQr};

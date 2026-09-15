@@ -1,0 +1,436 @@
+{
+  "source": "Loop test case.xlsx",
+  "features": [
+    {
+      "id": "F01",
+      "name": "Cash In (Wing Accounts) with Manual Input",
+      "material": "Wing Account KHR / USD",
+      "customerLive": "Yes"
+    },
+    {
+      "id": "F02",
+      "name": "Cash In (Wing Accounts) with Swipe Closed-Loop Card",
+      "material": "Closed-Loop Card KHR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F03",
+      "name": "Cash In (Wing Accounts) with Swipe Closed-Loop Card",
+      "material": "Closed-Loop Card USD",
+      "customerLive": "No"
+    },
+    {
+      "id": "F04",
+      "name": "Cash In by Scan Static QR",
+      "material": "Printed Static QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F05",
+      "name": "Cash In to Other Bank (Bakong Member) with Scan QR",
+      "material": "Printed Other Bank QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F06",
+      "name": "Cash In to Other Bank (Bakong Member) with Scan QR",
+      "material": "Printed Other Bank QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F07",
+      "name": "Cash In to Other Bank (Bakong Member) with Scan QR",
+      "material": "Printed Other Bank QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F08",
+      "name": "Cash In to Other Bank (Bakong Member) with Scan QR Dynamic – Set Amount",
+      "material": "Prepared Dynamic QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F09",
+      "name": "Cash In to Other Bank (Bakong Member) with Scan QR Dynamic – Set Amount",
+      "material": "Prepared Dynamic QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F10",
+      "name": "Cash In to Other Bank (Bakong Member) with Scan QR Dynamic – Set Amount",
+      "material": "Prepared Dynamic QR",
+      "customerLive": "No"
+    },
+    {
+      "id": "F11",
+      "name": "Cash In with Scan Dynamic QR",
+      "material": "Prepared Dynamic QR",
+      "customerLive": "No"
+    }
+  ],
+  "rounds": [
+    {
+      "name": "R1",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F01"
+        },
+        {
+          "tester": 2,
+          "featureId": "F02"
+        },
+        {
+          "tester": 3,
+          "featureId": "F03"
+        },
+        {
+          "tester": 4,
+          "featureId": "F04"
+        },
+        {
+          "tester": 5,
+          "featureId": "F05"
+        },
+        {
+          "tester": 6,
+          "featureId": "F06"
+        },
+        {
+          "tester": 7,
+          "featureId": "F07"
+        }
+      ]
+    },
+    {
+      "name": "R2",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F02"
+        },
+        {
+          "tester": 2,
+          "featureId": "F03"
+        },
+        {
+          "tester": 3,
+          "featureId": "F04"
+        },
+        {
+          "tester": 4,
+          "featureId": "F05"
+        },
+        {
+          "tester": 5,
+          "featureId": "F06"
+        },
+        {
+          "tester": 6,
+          "featureId": "F07"
+        },
+        {
+          "tester": 7,
+          "featureId": "F08"
+        }
+      ]
+    },
+    {
+      "name": "R3",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F03"
+        },
+        {
+          "tester": 2,
+          "featureId": "F04"
+        },
+        {
+          "tester": 3,
+          "featureId": "F05"
+        },
+        {
+          "tester": 4,
+          "featureId": "F06"
+        },
+        {
+          "tester": 5,
+          "featureId": "F07"
+        },
+        {
+          "tester": 6,
+          "featureId": "F08"
+        },
+        {
+          "tester": 7,
+          "featureId": "F09"
+        }
+      ]
+    },
+    {
+      "name": "R4",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F04"
+        },
+        {
+          "tester": 2,
+          "featureId": "F05"
+        },
+        {
+          "tester": 3,
+          "featureId": "F06"
+        },
+        {
+          "tester": 4,
+          "featureId": "F07"
+        },
+        {
+          "tester": 5,
+          "featureId": "F08"
+        },
+        {
+          "tester": 6,
+          "featureId": "F09"
+        },
+        {
+          "tester": 7,
+          "featureId": "F10"
+        }
+      ]
+    },
+    {
+      "name": "R5",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F05"
+        },
+        {
+          "tester": 2,
+          "featureId": "F06"
+        },
+        {
+          "tester": 3,
+          "featureId": "F07"
+        },
+        {
+          "tester": 4,
+          "featureId": "F08"
+        },
+        {
+          "tester": 5,
+          "featureId": "F09"
+        },
+        {
+          "tester": 6,
+          "featureId": "F10"
+        },
+        {
+          "tester": 7,
+          "featureId": "F11"
+        }
+      ]
+    },
+    {
+      "name": "R6",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F06"
+        },
+        {
+          "tester": 2,
+          "featureId": "F07"
+        },
+        {
+          "tester": 3,
+          "featureId": "F08"
+        },
+        {
+          "tester": 4,
+          "featureId": "F09"
+        },
+        {
+          "tester": 5,
+          "featureId": "F10"
+        },
+        {
+          "tester": 6,
+          "featureId": "F11"
+        },
+        {
+          "tester": 7,
+          "featureId": "F01"
+        }
+      ]
+    },
+    {
+      "name": "R7",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F07"
+        },
+        {
+          "tester": 2,
+          "featureId": "F08"
+        },
+        {
+          "tester": 3,
+          "featureId": "F09"
+        },
+        {
+          "tester": 4,
+          "featureId": "F10"
+        },
+        {
+          "tester": 5,
+          "featureId": "F11"
+        },
+        {
+          "tester": 6,
+          "featureId": "F01"
+        },
+        {
+          "tester": 7,
+          "featureId": "F02"
+        }
+      ]
+    },
+    {
+      "name": "R8",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F08"
+        },
+        {
+          "tester": 2,
+          "featureId": "F09"
+        },
+        {
+          "tester": 3,
+          "featureId": "F10"
+        },
+        {
+          "tester": 4,
+          "featureId": "F11"
+        },
+        {
+          "tester": 5,
+          "featureId": "F01"
+        },
+        {
+          "tester": 6,
+          "featureId": "F02"
+        },
+        {
+          "tester": 7,
+          "featureId": "F03"
+        }
+      ]
+    },
+    {
+      "name": "R9",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F09"
+        },
+        {
+          "tester": 2,
+          "featureId": "F10"
+        },
+        {
+          "tester": 3,
+          "featureId": "F11"
+        },
+        {
+          "tester": 4,
+          "featureId": "F01"
+        },
+        {
+          "tester": 5,
+          "featureId": "F02"
+        },
+        {
+          "tester": 6,
+          "featureId": "F03"
+        },
+        {
+          "tester": 7,
+          "featureId": "F04"
+        }
+      ]
+    },
+    {
+      "name": "R10",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F10"
+        },
+        {
+          "tester": 2,
+          "featureId": "F11"
+        },
+        {
+          "tester": 3,
+          "featureId": "F01"
+        },
+        {
+          "tester": 4,
+          "featureId": "F02"
+        },
+        {
+          "tester": 5,
+          "featureId": "F03"
+        },
+        {
+          "tester": 6,
+          "featureId": "F04"
+        },
+        {
+          "tester": 7,
+          "featureId": "F05"
+        }
+      ]
+    },
+    {
+      "name": "R11",
+      "items": [
+        {
+          "tester": 1,
+          "featureId": "F11"
+        },
+        {
+          "tester": 2,
+          "featureId": "F01"
+        },
+        {
+          "tester": 3,
+          "featureId": "F02"
+        },
+        {
+          "tester": 4,
+          "featureId": "F03"
+        },
+        {
+          "tester": 5,
+          "featureId": "F04"
+        },
+        {
+          "tester": 6,
+          "featureId": "F05"
+        },
+        {
+          "tester": 7,
+          "featureId": "F06"
+        }
+      ]
+    }
+  ]
+}
