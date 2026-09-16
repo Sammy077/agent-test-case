@@ -33,17 +33,17 @@
     },
     {
       "id": "F05",
-      "name": "Cash out by scan on QR From Wingbank App (KHR)",
+      "name": "Cash out by scan on QR From Wingbank App (1)",
       "scenario": "1. CO from customer FC to WCX by Scan Standee QR from Wing Bank",
       "instructions": "1. Scan cash out from wing bank bank with QR standee",
-      "raw": "Cash out by scan on QR From Wingbank App (KHR)\n\nTest Scenario\n1. CO from customer FC to WCX by Scan Standee QR from Wing Bank\n\nInstruction\n1. Scan cash out from wing bank bank with QR standee"
+      "raw": "Cash out by scan on QR From Wingbank App (1)\n\nTest Scenario\n1. CO from customer FC to WCX by Scan Standee QR from Wing Bank\n\nInstruction\n1. Scan cash out from wing bank bank with QR standee"
     },
     {
       "id": "F06",
-      "name": "Cash out by scan on QR From Wingbank App (USD)",
+      "name": "Cash out by scan on QR From Wingbank App (2)",
       "scenario": "1. CO from customer FC to WCX by Scan Standee QR from Wing Bank",
       "instructions": "1. Scan cash out from wing bank bank with QR standee",
-      "raw": "Cash out by scan on QR From Wingbank App (USD)\n\nTest Scenario\n1. CO from customer FC to WCX by Scan Standee QR from Wing Bank\n\nInstruction\n1. Scan cash out from wing bank bank with QR standee"
+      "raw": "Cash out by scan on QR From Wingbank App (2)\n\nTest Scenario\n1. CO from customer FC to WCX by Scan Standee QR from Wing Bank\n\nInstruction\n1. Scan cash out from wing bank bank with QR standee"
     },
     {
       "id": "F07",
