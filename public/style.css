@@ -579,3 +579,34 @@ body:not(.tv) .my-agent-schedule-table{min-width:640px;table-layout:fixed}
 .my-agent-round-values dd{margin:6px 0 0;font-size:1.5rem;font-weight:700;line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 @media(min-width:1500px){.my-agent-round-values h2{font-size:clamp(20px,.75vw,28px)}.my-agent-round-values dt{font-size:clamp(18px,.65vw,24px)}.my-agent-round-values dd{font-size:clamp(24px,1vw,36px)}}
 @media(max-width:600px){.my-agent-round-values{padding:16px}.my-agent-round-values dl{grid-template-columns:1fr;gap:12px}.my-agent-round-values dl > div{display:flex;align-items:center;justify-content:space-between;gap:16px}.my-agent-round-values dd{margin:0;font-size:1.25rem}}
+.my-agent-card-grid{display:flex;overflow-x:auto;align-items:flex-start;scroll-snap-type:x proximity;padding-block-end:12px}
+.my-agent-workload-card{flex:0 0 clamp(260px,calc((100% - 120px)/7),420px);scroll-snap-align:start}
+.my-agent-case-stack{display:grid;gap:12px;padding:12px}
+.my-agent-case-stack .my-agent-loop-feature{padding:14px;border:1px solid #d5e0e8;border-radius:10px;background:#f7fafc}
+.my-agent-schedule-table .my-agent-feature-code{display:block;margin-block:4px;white-space:normal;overflow-wrap:anywhere;font-weight:400}
+.my-agent-card-grid-visible{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));overflow:visible;align-items:start}
+.my-agent-card-grid-visible .my-agent-workload-card{width:auto;max-width:none;min-width:0}
+@media(max-width:760px){.my-agent-card-grid-visible{display:flex;overflow-x:auto}.my-agent-card-grid-visible .my-agent-workload-card{flex:0 0 min(88vw,380px)}}
+@media(min-width:1000px){
+ .my-agent-card-grid-visible{grid-template-columns:repeat(7,minmax(0,1fr));width:100%}
+}
+.my-agent-card-grid-visible .my-agent-workload-card{display:flex;flex-direction:column;height:min(70vh,760px);overflow:hidden}
+.my-agent-card-grid-visible .my-agent-workload-card > h2{flex:0 0 auto}
+.my-agent-card-grid-visible .my-agent-case-stack{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-inline-end:10px}
+.my-agent-card-grid-visible .my-agent-case-stack:focus-visible{outline:3px solid var(--focus);outline-offset:-3px}
+@media(max-width:760px){.my-agent-card-grid-visible .my-agent-workload-card{height:min(68vh,680px)}}
+/* Grouped scenarios inside one classic agent card; remove Kanban tile appearance. */
+.my-agent-case-stack{gap:0;padding:0}
+.my-agent-case-stack .my-agent-loop-feature{padding:18px 20px;border:0;border-radius:0;background:transparent}
+.my-agent-case-stack .my-agent-loop-feature + .my-agent-loop-feature{border-block-start:1px solid #d5e0e8}
+/* Seven classic tester cards: four columns, then three. */
+.my-agent-tester-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px;margin-block:20px;align-items:stretch}
+.my-agent-tester-card{min-width:0;overflow:hidden}
+.my-agent-tester-card h2{margin:0;padding:14px 20px;border-block-end:1px solid #d5e0e8;font-size:1rem}
+.my-agent-tester-card .my-agent-loop-feature{padding:14px 20px 20px;font-size:.875rem;line-height:1.45}
+.my-agent-tester-card .my-agent-loop-feature > b{display:block;line-height:1.35}
+.my-agent-empty-card{padding:20px;margin:0}
+@media(max-width:1100px){.my-agent-tester-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.my-agent-tester-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:440px){.my-agent-tester-grid{grid-template-columns:1fr}}
+@media(min-width:1500px){.my-agent-tester-grid{gap:24px;margin-block:24px}.my-agent-tester-card h2{font-size:clamp(20px,.85vw,30px)}.my-agent-tester-card .my-agent-loop-feature{font-size:clamp(18px,.65vw,24px)}}

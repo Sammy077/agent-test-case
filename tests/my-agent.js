@@ -16,10 +16,10 @@ async function request(url,method='GET',body,token=csrf){const response=await fe
  assert.equal((await request('/api/my-agent/loop/next','POST',{round:1,step:1})).status,409);
  assert.equal((await request('/api/my-agent/loop/next-step','POST',{round:1,step:1})).status,200);
  assert.equal((await request('/api/my-agent/loop/next-step','POST',{round:1,step:1})).status,409);
- assert.deepEqual((await request('/api/my-agent/loop')).data.items.map(i=>i.feature.id),['F07','F01','F02','F03','F04','F05','F06']);
+ assert.deepEqual((await request('/api/my-agent/loop')).data.items.map(i=>i.features.length),[0,1,1,0,0,0,0]);
  for(let step=2;step<7;step++)assert.equal((await request('/api/my-agent/loop/next-step','POST',{round:1,step})).status,200);
  assert.equal((await request('/api/my-agent/loop/next','POST',{round:1,step:7})).status,200);
- const changed=(await request('/api/my-agent/loop')).data;assert.equal(changed.round,2);assert.equal(changed.step,1);assert.equal(changed.roundValues.amount,'5,000 KHR');
+ const changed=(await request('/api/my-agent/loop')).data;assert.equal(changed.round,2);assert.equal(changed.step,1);assert.equal(changed.roundValues.amount,'25.01 USD / 100,100 KHR');
  assert.equal((await request('/api/my-agent/scenarios','POST',{name:'Bad',amount:-1,currency:'KHR',subtasks:[]})).status,400);
  assert.equal((await request('/api/my-agent/scenarios','POST',{name:'Test',amount:1,currency:'USD',subtasks:[{name:'Step',expectedResult:'Pass'}]},'wrong')).status,403);
  for(let i=1;i<=9;i++)assert.equal((await request('/api/my-agent/scenarios','POST',{name:'Scenario '+i,amount:100,currency:'KHR',subtasks:[{name:'First',expectedResult:'Expected 1'},{name:'Second',expectedResult:'Expected 2'}]})).status,201);

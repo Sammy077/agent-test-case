@@ -121,10 +121,10 @@ Administration → Import production sample · Excel → enter Channel name → 
 
 ### My Agent rounds
 
-Administrators can open **My Agent** to view `Round Plan Testing(1).numbers`: seven scenarios and seven rounds for seven testers (A01–A07). All seven cards display assigned Cash Out scenario, instructions, scenario and instructions. Round 1 appears immediately. **Next Round** changes the displayed round without completion gates. Round 7 loops back to Round 1. No status, progress, completion buttons, or results tracking. **Workbook Schedule** displays the full reference matrix. Existing testing results remain saved separately.
+Administrators can open **My Agent** to view `Round Plan Testing(2).numbers`: eight amount rounds with seven rotating steps for seven testers (A01–A07). Seven standalone tester cards stay visible in a four-plus-three desktop grid. Round 1 appears immediately. **Next Step** rotates current scenarios; **Next Round** changes transaction values and switches to Cash Out Non-wing scenarios after Round 4. Round 8 loops back to Round 1. No status, progress, completion buttons, or results tracking. **Workbook Schedule** displays current round reference matrix. Existing testing results remain saved separately.
 
 Run `npm run test:agent-loop` for workbook mapping, unrestricted navigation, stale requests, and final-round behavior.
 
 Run `npm run test:my-agent` for round creation, rotation, stale/repeated requests, access control, result preservation, workbook protection, and replacement/reset compatibility.
 
-My Agent separates seven amount rounds from seven rotation steps. Back/Next Step rotates scenarios while transaction values stay fixed. Next Round becomes available at Step 7 and starts Step 1 with next round’s values; Round 7 wraps to Round 1. Back Round returns previous amount round at Step 1. Navigation includes round and step to reject stale requests.
+My Agent separates six amount rounds from seven rotation steps. Back/Next Step rotates scenarios while transaction values stay fixed. Next Round becomes available at Step 7 and starts Step 1 with next round’s values; Round 6 wraps to Round 1. Back Round returns previous amount round at Step 1. Navigation includes round and step to reject stale requests.
