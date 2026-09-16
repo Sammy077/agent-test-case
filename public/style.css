@@ -571,3 +571,11 @@ body:not(.tv) .my-agent-schedule-table{min-width:640px;table-layout:fixed}
 .my-agent-loop-feature h3{margin:14px 0 4px;font-size:1em}
 .my-agent-case-amounts{padding:8px 10px;border-radius:8px;background:#eef3f8;font-weight:600;white-space:pre-line}
 .my-agent-feature-key dd > span{white-space:pre-line}
+.my-agent-round-values{padding:20px;margin-block:0 20px}
+.my-agent-round-values h2{margin:0 0 16px;padding:0;font-size:1rem;border:0}
+.my-agent-round-values dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:0}
+.my-agent-round-values dl > div{padding:16px;border-radius:12px;background:#eef3f8;min-width:0}
+.my-agent-round-values dt{color:var(--muted);font-size:.875rem}
+.my-agent-round-values dd{margin:6px 0 0;font-size:1.5rem;font-weight:700;line-height:1.25;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(min-width:1500px){.my-agent-round-values h2{font-size:clamp(20px,.75vw,28px)}.my-agent-round-values dt{font-size:clamp(18px,.65vw,24px)}.my-agent-round-values dd{font-size:clamp(24px,1vw,36px)}}
+@media(max-width:600px){.my-agent-round-values{padding:16px}.my-agent-round-values dl{grid-template-columns:1fr;gap:12px}.my-agent-round-values dl > div{display:flex;align-items:center;justify-content:space-between;gap:16px}.my-agent-round-values dd{margin:0;font-size:1.25rem}}
