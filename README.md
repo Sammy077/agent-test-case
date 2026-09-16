@@ -126,3 +126,5 @@ Administrators can open **My Agent** to view `Round Plan Testing(1).numbers`: se
 Run `npm run test:agent-loop` for workbook mapping, unrestricted navigation, stale requests, and final-round behavior.
 
 Run `npm run test:my-agent` for round creation, rotation, stale/repeated requests, access control, result preservation, workbook protection, and replacement/reset compatibility.
+
+My Agent separates seven amount rounds from seven rotation steps. Back/Next Step rotates scenarios while transaction values stay fixed. Next Round becomes available at Step 7 and starts Step 1 with next round’s values; Round 7 wraps to Round 1. Back Round returns previous amount round at Step 1. Navigation includes round and step to reject stale requests.

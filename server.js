@@ -397,6 +397,8 @@ async function api(req,res,url){
     if(url.pathname==='/api/my-agent'&&req.method==='GET')return json(res,200,myAgent.overview(db));
     if(req.method==='POST'){
       const input=await bodyJson(req);
+      if(url.pathname==='/api/my-agent/loop/next-step'){const result=agentLoop.nextStep(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
+      if(url.pathname==='/api/my-agent/loop/back-step'){const result=agentLoop.backStep(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
       if(url.pathname==='/api/my-agent/loop/back'){const result=agentLoop.back(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
       if(url.pathname==='/api/my-agent/loop/next'){const result=agentLoop.next(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,200,result)}
       if(url.pathname==='/api/my-agent/scenarios'){const result=myAgent.create(db,input,user.username,audit);broadcast('refresh',{scope:'all'});return json(res,201,result)}
