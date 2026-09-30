@@ -12,6 +12,7 @@ const {backupDatabase,replaceProductionData}=require('./lib/production-replaceme
 const views=require('./lib/htmx-views');
 const myAgent=require('./lib/my-agent');
 const agentLoop=require('./lib/agent-loop');
+const criticalDashboard=require('./lib/critical-dashboard');
 const {caseOrder,sortSelection,observerCaseFilter}=require('./lib/case-query');
 const {migrateMultipleCaseUsers,addCaseUser:rawAddCaseUser,hydrateCaseUsers,caseJoins}=require('./lib/case-assignments');
 
@@ -45,6 +46,7 @@ CREATE TABLE IF NOT EXISTS audit_log(id INTEGER PRIMARY KEY,actor TEXT NOT NULL,
 
 myAgent.setup(db);
 agentLoop.setup(db);
+criticalDashboard.setup(db);
 function addCaseUser(db,caseId,participantId,actor){
  const scenario=db.prepare('SELECT s.participant_id FROM agent_scenario_cases sc JOIN agent_scenarios s ON s.id=sc.scenario_id WHERE sc.case_id=?').get(caseId);
  if(scenario&&scenario.participant_id!==participantId)throw Object.assign(Error('My Agent scenario subtasks must stay with round-assigned agent'),{status:409});
@@ -422,6 +424,16 @@ async function api(req,res,url){
     const u=requireRole(req,res);if(!u)return;
     const nl=String.fromCharCode(10);res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive'});res.write('event: connected'+nl+'data: {}'+nl+nl);clients.add(res);req.on('close',()=>clients.delete(res));return;
   }
+  if(url.pathname==='/api/critical-dashboard'&&req.method==='GET'){
+    const user=requireRole(req,res,['MANAGER','DISPLAY','ADMIN','QA_LEAD','OBSERVER']);if(!user)return;
+    return json(res,200,criticalDashboard.summary(db));
+  }
+  if(url.pathname==='/api/critical-dashboard/import'&&req.method==='POST'){
+    const user=requireWrite(req,res,['ADMIN']);if(!user)return;
+    if(!String(req.headers['content-type']||'').includes('spreadsheetml'))return json(res,415,{error:'A .xlsx workbook is required'});
+    try{const fileName=cleanText(url.searchParams.get('file'))||'critical.xlsx';const result=criticalDashboard.importWorkbook(db,await readBody(req,XLSX_LIMIT),user.username,audit,fileName);broadcast('refresh',{scope:'all'});return json(res,200,result)}
+    catch(error){return json(res,error.status||500,{error:error.message,errors:error.errors||[]})}
+  }
   if(url.pathname==='/api/dashboard'){
     const u=requireRole(req,res,['MANAGER','DISPLAY','ADMIN','QA_LEAD','OBSERVER']);if(!u)return;
     return json(res,200,summary());
@@ -587,7 +599,7 @@ function adminData(url){
   const participants=db.prepare('SELECT * FROM participants ORDER BY type,code').all(),users=db.prepare("SELECT u.id,u.username,u.role,u.display_name,u.active FROM users u WHERE u.role IN ('MANAGER','DISPLAY') ORDER BY u.role,u.username").all(),filter=assignmentCaseFilter(url),status=cleanText(url.searchParams.get('status')).toUpperCase(),page=Math.max(1,Number(url.searchParams.get('page'))||1),limit=50,offset=(page-1)*limit;if(status==='NOT_STARTED'){filter.sql+=' AND EXISTS(SELECT 1 FROM assignments af WHERE af.test_case_id=tc.id AND af.status=?)';filter.args.push(status)}
   const cases=db.prepare(`SELECT tc.id,tc.case_code,tc.source_case_id,tc.channel,tc.source_sheet,tc.subcategory,tc.category,tc.type,tc.main_feature,tc.sub_feature,tc.title,tc.priority,a.participant_id,p.code participant_code,p.name participant_name,a.status assignment_status,a.production_status FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql} ORDER BY ${caseOrder(url,'tc.channel COLLATE NOCASE,tc.priority,tc.case_code')} LIMIT ? OFFSET ?`).all(...filter.args,limit,offset);
   const total=db.prepare(`SELECT COUNT(*) count FROM test_cases tc${caseJoins}WHERE 1=1${filter.sql}`).get(...filter.args).count;
-  return {createdParticipant:participants.find(p=>p.id===Number(url.searchParams.get('createdParticipant')))||null,participants,users,cases:{items:hydrateCaseUsers(db,cases),offset,limit,total,page},dashboard:summary(),selectedChannel:cleanText(url.searchParams.get('channel')),assignable:status==='NOT_STARTED',availableSheets:assignmentSheets(url),selectedSheet:url.searchParams.get('sheet')||'',selectedPriority:cleanText(url.searchParams.get('priority')),...sortSelection(url),filters:Object.fromEntries(url.searchParams)};
+  return {createdParticipant:participants.find(p=>p.id===Number(url.searchParams.get('createdParticipant')))||null,participants,users,cases:{items:hydrateCaseUsers(db,cases),offset,limit,total,page},critical:criticalDashboard.sourceSummary(db),dashboard:summary(),selectedChannel:cleanText(url.searchParams.get('channel')),assignable:status==='NOT_STARTED',availableSheets:assignmentSheets(url),selectedSheet:url.searchParams.get('sheet')||'',selectedPriority:cleanText(url.searchParams.get('priority')),...sortSelection(url),filters:Object.fromEntries(url.searchParams)};
 }
 function renderHtmxPage(req,res,url){
   const fragment=req.headers['hx-request']==='true'&&req.headers['hx-target']==='content',path=url.pathname,user=auth(req);
@@ -645,6 +657,7 @@ async function actions(req,res,url){
   else if(url.pathname.match(/^\/actions\/users\/\d+\/active$/)){apiPath='/api/users/'+url.pathname.split('/')[3]+'/active';method='PUT';payload={...form,active:form.active==='1'}}
   else if(url.pathname==='/actions/import-production'){if(!form.workbook||typeof form.workbook.arrayBuffer!=='function'||!String(form.workbook.name).toLowerCase().endsWith('.xlsx'))return html(res,400,'<section class="notice error">Select an .xlsx production workbook.</section>');apiPath='/api/test-cases/import-production?channel='+encodeURIComponent(form.channel||'');payload=Buffer.from(await form.workbook.arrayBuffer());contentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
   else if(url.pathname==='/actions/import-xlsx'){apiPath='/api/test-cases/import-xlsx';payload=Buffer.from(await form.workbook.arrayBuffer());contentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
+  else if(url.pathname==='/actions/import-critical'){if(!form.workbook||typeof form.workbook.arrayBuffer!=='function'||!String(form.workbook.name).toLowerCase().endsWith('.xlsx'))return html(res,400,'<section class="notice error">Select an .xlsx Master workbook.</section>');apiPath='/api/critical-dashboard/import?file='+encodeURIComponent(form.workbook.name||'critical.xlsx');payload=Buffer.from(await form.workbook.arrayBuffer());contentType='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}
   else if(url.pathname==='/actions/assignments/bulk'){apiPath='/api/test-cases/assignments';method='PUT';payload={...form,caseIds:[].concat(form.caseIds||[]).map(Number)}}
   else if(url.pathname.match(/^\/actions\/test-cases\/\d+\/assignment$/)){apiPath='/api/test-cases/'+url.pathname.split('/')[3]+'/assignment';method='PUT'}
   else if(url.pathname.match(/^\/actions\/assignments\/\d+\/start$/)){apiPath='/api/assignments/'+url.pathname.split('/')[3]+'/status';method='PUT';payload={...form,status:'IN_PROGRESS'}}
