@@ -18,7 +18,7 @@
     "test:my-agent": "node tests/my-agent.js",
     "test:participant-create": "node tests/participant-create-feedback.js",
     "test:agent-loop": "node tests/agent-loop.js",
-    "test:critical": "node tests/xlsx-lite.js && node tests/critical-dashboard.js && node tests/critical-import.js && node tests/critical-tv.js"
+    "test:critical": "node tests/xlsx-lite.js && node tests/critical-dashboard.js && node tests/critical-api.js && node tests/critical-tv.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

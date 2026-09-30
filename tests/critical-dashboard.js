@@ -36,15 +36,16 @@ const summary=critical.summary(db);
 assert.deepEqual(summary.metrics,{
   total:5,pos:1,ekyc:2,other_channel:2,
   not_executed:1,passed:1,failed:1,blocked:0,retest_required:1,
-  missing_tid:3,tid_required:4,tid_completed:1,tid_completion_pct:25,
+  missing_tid:3,tid_required:4,tid_completed:1,tid_completion_pct:40,
   finance_correct:1,finance_error:1,finance_pending:2,finance_no_txn:1,
   finance_verified:3,finance_completion_pct:60,
+  finance_not_verify_yet:2,finance_pending_raw:0,finance_na:0,
 });
 assert.deepEqual(summary.channels,[{name:'POS',value:1},{name:'eKYC',value:2}]);
-assert.deepEqual(summary.finance,[{name:'Correct',value:1},{name:'Incorrect',value:1},{name:'Not Verify Yet',value:2},{name:'No Perform TXN',value:1}]);
+assert.deepEqual(summary.finance,[{name:'Correct',value:1},{name:'Incorrect',value:1},{name:'Not Verify Yet',value:2},{name:'Pending',value:0},{name:'N/A',value:0},{name:'No Perform TXN',value:1}]);
 assert.deepEqual(summary.testers.map(tester=>tester.name),['Det Dam','Koemly Hort','Sakhorn Pok','Unassigned']);
 assert.deepEqual(summary.testers[0],{name:'Det Dam',total:2,passed:0,failed:1,not_executed:0,blocked:0,retest_required:1,missing_tid:1,finance_correct:1,finance_error:1,finance_pending:0,finance_no_txn:0,executed:2,pending:0,completion_pct:100});
-assert.deepEqual(summary.testers[2],{name:'Sakhorn Pok',total:1,passed:0,failed:0,not_executed:0,blocked:0,retest_required:0,missing_tid:1,finance_correct:0,finance_error:0,finance_pending:1,finance_no_txn:0,executed:0,pending:1,completion_pct:0});
+assert.deepEqual(summary.testers[2],{name:'Sakhorn Pok',total:1,passed:0,failed:0,not_executed:0,blocked:0,retest_required:0,missing_tid:1,finance_correct:0,finance_error:0,finance_pending:1,finance_no_txn:0,executed:0,pending:1,completion_pct:100});
 assert.deepEqual(summary.testers[3],{name:'Unassigned',total:1,passed:0,failed:0,not_executed:1,blocked:0,retest_required:0,missing_tid:1,finance_correct:0,finance_error:0,finance_pending:1,finance_no_txn:0,executed:0,pending:1,completion_pct:0});
 assert.equal(summary.testers.reduce((sum,tester)=>sum+tester.not_executed,0),summary.metrics.not_executed,'tester Not Executed must agree with the KPI, including for unrecognised statuses');
 assert.equal(summary.source.file_name,'master-critical.xlsx');
