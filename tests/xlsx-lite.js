@@ -26,6 +26,7 @@ assert.equal(records[0]['Service / Main Feature'],'Cash In');
 assert.equal(records[1]['TID'],'N/A');
 
 assert.throws(()=>readRecords(buffer,{sheetName:'Sheet1',required,wanted}),error=>error.status===400&&/MASTER - All Test Cases/.test(error.message),'missing sheet names the available sheets');
-assert.throws(()=>readRecords(buffer,{sheetName:sheet,required:required.concat(['Not A Column']),wanted}),error=>error.status===400&&/Not A Column/.test(error.message),'missing header is reported');
+assert.throws(()=>readRecords(buffer,{sheetName:sheet,required:required.concat(['Not A Column']),wanted}),error=>error.status===400&&/Missing columns in sheet/.test(error.message)&&/Not A Column/.test(error.message),'a column missing from an existing header row is reported by name');
+assert.throws(()=>readRecords(buffer,{sheetName:sheet,required:['Not A Column','Also Not There'],wanted}),error=>error.status===400&&/Could not find the Master header row/.test(error.message),'an absent header row is reported separately');
 assert.throws(()=>readRecords(Buffer.from('not a zip'),{sheetName:sheet,required,wanted}),error=>error.status===400,'unreadable archive is a 400');
 console.log('PASS: xlsx-lite reads sheets, shared/inline strings, numbers, absolute targets and fails loudly');
