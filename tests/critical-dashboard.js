@@ -26,7 +26,7 @@ assert.equal(parsed.records[0].tester,'','blank tester is stored blank and label
 const before=critical.summary(db);
 assert.equal(before.metrics.total,0,'nothing is stored before the first import');
 
-const imported=critical.importWorkbook(db,buffer,'admin',()=>{});
+const imported=critical.importWorkbook(db,buffer,'admin',()=>{},'master-critical.xlsx');
 assert.equal(imported.imported,4);
 assert.equal(imported.missingTid,2);
 assert.equal(imported.allTidCompletedAt,null,'two required TIDs are missing');
@@ -54,7 +54,7 @@ assert.ok(already,'completion time is recorded');
 assert.equal(critical.resolveTidCompletion(db,0),already,'a second zero reading keeps the first timestamp');
 assert.equal(critical.resolveTidCompletion(db,1),null,'a missing required TID clears it');
 
-assert.equal(critical.importWorkbook(db,buffer,'admin',()=>{}).imported,4,'re-import replaces rather than appends');
+assert.equal(critical.importWorkbook(db,buffer,'admin',()=>{},'master-critical.xlsx').imported,4,'re-import replaces rather than appends');
 assert.equal(db.prepare('SELECT COUNT(*) n FROM critical_cases').get().n,4);
 const source=critical.sourceSummary(db);
 assert.equal(source.total_rows,4);
