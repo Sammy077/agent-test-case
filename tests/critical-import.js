@@ -12,17 +12,17 @@ async function upload(token=csrf,type='application/vnd.openxmlformats-officedocu
 
  assert.equal((await upload()).status,200,'Admin can import the Master workbook');
  const stored=db.prepare('SELECT COUNT(*) n FROM critical_cases').get().n;
- assert.equal(stored,4);
+ assert.equal(stored,5);
  assert.equal((await upload()).status,200,'re-import replaces the previous upload');
- assert.equal(db.prepare('SELECT COUNT(*) n FROM critical_cases').get().n,4,'no duplicate rows');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM critical_cases').get().n,5,'no duplicate rows');
  assert.equal((await upload('wrong')).status,403,'CSRF is enforced');
  assert.equal((await upload(csrf,'application/json')).status,415,'only .xlsx payloads are accepted');
 
  const dashboard=await fetch(base+'/api/critical-dashboard',{headers:{Cookie:cookie}});
  assert.equal(dashboard.status,200);
  const payload=await dashboard.json();
- assert.equal(payload.metrics.total,4);
- assert.equal(payload.metrics.missing_tid,2);
+ assert.equal(payload.metrics.total,5);
+ assert.equal(payload.metrics.missing_tid,3);
 
  const manager=crypto.pbkdf2Sync('Manager@123','ptc-v1',120000,32,'sha256').toString('hex');
  db.prepare("INSERT INTO users(username,password_hash,role,display_name) VALUES('manager1',?,'MANAGER','Manager')").run(manager);

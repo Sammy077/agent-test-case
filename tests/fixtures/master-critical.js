@@ -32,6 +32,7 @@ const data=[
   ['R-4','Other Bank','CR-4','Critical','Cash Out','Bakong','Scenario 4','Pass','','T-9','Retest Required','Det Dam','Correct',''],
   ['R-5','WCX POS Premium','NC-1','None-Critical','Cash In','Manual','Scenario 5','Pass','','T-10','Passed','Koemly Hort','Correct',''],
   ['R-6','WCX POS Standard','NC-2','None-Critical','Cash In','Manual','Scenario 6','Pass','','','Not executed','','Not Verify Yet',''],
+  ['R-7','Some Bank','CR-5','Critical','Cash Out','Swift','Scenario 7','Pass','','','In Progress','Sakhorn Pok','Not Verify Yet',''],
 ];
 // Every text value goes through the shared string table. One entry uses two rich-text runs.
 const runs=[...headers.map(name=>[name]),...data.flat().filter(value=>value&&!/^\d+$/.test(value)).map(value=>[value]),['Cash ','In']];

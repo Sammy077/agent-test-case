@@ -11,7 +11,7 @@ assert.ok(entries.has('xl/worksheets/sheet1.xml'),'zip entries are listed');
 assert.equal(entries.get('xl/worksheets/sheet2.xml').method,0,'stored entry is listed');
 
 const rows=readSheetRows(buffer,sheet);
-assert.equal(rows.length,9,'title, blank, header and six data rows');
+assert.equal(rows.length,10,'title, blank, header and seven data rows');
 assert.equal(rows[2][1],'Record Key','header row is returned raw');
 assert.equal(rows[3][9],'46200','numbers pass through as text');
 assert.equal(rows[3][5],'Cash In','shared rich-text runs are joined');
@@ -20,7 +20,7 @@ assert.equal(rows[5][7],'Scenario 3','inline strings are read');
 const {records,headerRow,sheetNames}=readRecords(buffer,{sheetName:sheet,required,wanted});
 assert.equal(headerRow,2,'header is the third row');
 assert.deepEqual(sheetNames,['MASTER - All Test Cases','Notes']);
-assert.equal(records.length,6);
+assert.equal(records.length,7);
 assert.equal(records[0]['Record Key'],'R-1');
 assert.equal(records[0]['Service / Main Feature'],'Cash In');
 assert.equal(records[1]['TID'],'N/A');
