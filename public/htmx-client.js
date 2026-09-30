@@ -11,9 +11,12 @@ function setupNavigation(){const button=document.querySelector('.menu-toggle'),n
 function updateSelection(){const boxes=[...document.querySelectorAll('.case-select')],checked=boxes.filter(x=>x.checked),count=document.querySelector('#selected-count');if(count)count.textContent=String(checked.length)}
 document.addEventListener('click',event=>{if(event.target.closest('[data-back]')){if(history.length>1)history.back();else location.href='/tv/management'}if(event.target.id==='select-page'){document.querySelectorAll('.case-select').forEach(x=>x.checked=event.target.checked);updateSelection()}});
 document.addEventListener('change',event=>{if(event.target.matches('.case-select'))updateSelection()});
-document.addEventListener('DOMContentLoaded',()=>{syncPageMode(location.href);setupNavigation()});
-document.addEventListener('htmx:afterSwap',event=>{syncPageMode(event.detail.xhr?.responseURL||location.href);setupCountdown();setupNavigation();updateSelection()});
+document.addEventListener('DOMContentLoaded',()=>{syncPageMode(location.href);setupNavigation();setupClock();setupCriticalDonut()});
+document.addEventListener('htmx:afterSwap',event=>{syncPageMode(event.detail.xhr?.responseURL||location.href);setupCountdown();setupNavigation();setupClock();setupCriticalDonut();updateSelection()});
 // Capture before HTMX handles the form change so disabled Order By is enabled in time.
 document.addEventListener('change',event=>{if(event.target.name!=='sortBy')return;const order=event.target.closest('form')?.querySelector('[name="orderBy"]');if(order)order.disabled=event.target.value==='default'},true);
 
 // Assignment controls add users; existing assignments stay intact.
+let clockTimer;
+function setupClock(){clearInterval(clockTimer);const time=document.querySelector('[data-clock="time"]');if(!time)return;const date=document.querySelector('[data-clock="date"]');const tick=()=>{const now=new Date();time.textContent=now.toLocaleTimeString('en-GB',{hour12:false});if(date)date.textContent=now.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'})};tick();clockTimer=setInterval(tick,1000)}
+function setupCriticalDonut(){const donut=document.querySelector('[data-donut]');if(!donut)return;const angles=String(donut.dataset.donut||'').split(',').map(Number);if(angles.length!==4||angles.some(value=>!Number.isFinite(value)))return;const [correct,incorrect,pending]=angles,noTxn=angles[3],a=correct,b=a+incorrect,c=b+pending;donut.style.background='conic-gradient(var(--green) 0deg '+a+'deg,var(--red) '+a+'deg '+b+'deg,var(--amber) '+b+'deg '+c+'deg,var(--line) '+c+'deg '+(c+noTxn)+'deg,var(--line) '+(c+noTxn)+'deg 360deg)'}

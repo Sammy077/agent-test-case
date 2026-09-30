@@ -128,3 +128,11 @@ Run `npm run test:agent-loop` for workbook mapping, unrestricted navigation, sta
 Run `npm run test:my-agent` for round creation, rotation, stale/repeated requests, access control, result preservation, workbook protection, and replacement/reset compatibility.
 
 My Agent separates six amount rounds from seven rotation steps. Back/Next Step rotates scenarios while transaction values stay fixed. Next Round becomes available at Step 7 and starts Step 1 with next round’s values; Round 6 wraps to Round 1. Back Round returns previous amount round at Step 1. Navigation includes round and step to reject stale requests.
+
+### Critical Test TV
+
+`/tv/critical` is a Management TV screen for Critical-only testing, built from the workbook sheet `MASTER - All Test Cases` (`Priority Level = Critical`). Administrators upload that workbook in **Administration → Import Critical Test workbook**; the server stores the Critical rows and publishes them to the TV. It reports total Critical cases, POS/eKYC split, Not Executed/Passed/Failed, Missing TID with TID completion, Finance Correct/Error/Pending/No Perform TXN, and per-tester workload.
+
+Rules copied from the approved prototype: a TID is required unless `Finance Status = No Perform TXN` (a non-blank value such as `N/A` counts as supplied); blank `QA Tester` is shown as `Unassigned`; finance completion counts Correct + Incorrect + No Perform TXN over all Critical rows. The **ALL TID COMPLETE** time is recorded when an upload has zero missing required TIDs, kept until a later upload has a missing one, and persists across restarts.
+
+Read access matches Management TV (`MANAGER`, `DISPLAY`, `ADMIN`, `QA_LEAD`, `OBSERVER`); Agent and Branch cannot open it. Run `npm run test:critical` for the reader, calculations, upload and screen checks.
